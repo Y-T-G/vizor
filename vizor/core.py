@@ -1,5 +1,6 @@
 from powerboxes import iou_distance
 from dataclasses import dataclass
+from lru import LRU
 import numpy as np
 
 class BaseModel:
@@ -27,19 +28,25 @@ class Tracks:
         data in [x1,y1,x2,y2,score,label, tid] format
         """
         self.data = tracks
-        self.tracks = [Track(track[:4], *track[4:7]) for track in tracks]
 
     def __getitem__(self, idx):
-        return self.tracks[idx]
+        return Track(self.data[idx][:4], *self.data[idx][4:7])
 
     def __setitem__(self, idx, track):
-        self.tracks[idx] = track
+        if isinstance(track, Track):
+            self.data[idx] = [*track.box, track.conf, track.cls, track.id]
+        else:
+            self.data[idx] = track
+
+    def __len__(self):
+        return len(self.data)
 
     def __iter__(self):
-        return iter(self.tracks)
+        for i in range(len(self)):
+            yield self[i]
 
     def __repr__(self):
-        return str(self.tracks)
+        return str(list(self))
 
 
 class Preds(Tracks):
@@ -47,8 +54,8 @@ class Preds(Tracks):
         """
         data in [x1,y1,x2,y2,score,label] format
         """
-        self.data = preds
-        self.tracks = [Track(track[:4], *track[4:6], -1) for track in preds]
+        # Add -1 as track id for each prediction
+        self.data = np.column_stack([preds, np.full(len(preds), -1, dtype=preds.dtype)])
     
 
 class Refiner:
@@ -64,7 +71,7 @@ class Refiner:
         # mode only makes an inference on the individual instances.
         self.mode = mode
         # Keeps track of refined tracks
-        self.refined = {}
+        self.refined = LRU(size=100)
         # minimum confidence to trigger secondary inference
         self.min_conf = conf
         # minimum iou used to match secondary detections with primary detections
@@ -73,13 +80,15 @@ class Refiner:
         self.in_transform = in_transform
         self.out_transform = out_transform
 
-    def run(self, img, tracks):
+    def run(self, tracks, *args, img=None, preds=None, **kwargs):
         # use the whole image for secondary inference
+        tracks = self.in_transform(tracks, *args, **kwargs)
         if self.mode == "image":
             # If any track has less that this conf, they will be processed by the secondary model
             if any([track.conf <= self.min_conf for track in tracks]):
                 # preds would contain the results from secondary inference
-                preds = Preds(self.model.predict(img)[0].boxes.data.numpy())
+                if preds is None:
+                    preds = Preds(self.model.predict(img)[0].boxes.data.numpy())
                 # we need to match the secondary results with primary results
                 iou_tracks = 1 - iou_distance(tracks.data[:, :4], preds.data[:, :4])
                 for i, iou_track in enumerate(iou_tracks):
@@ -89,8 +98,15 @@ class Refiner:
                         # Update with rectified predictions
                         pred = preds[j]
                         track.box = pred.box
+                        track.conf = pred.conf
                         # Store the class so that we can map it even without secondary model run
                         self.refined[track.id] = cls = pred.cls
+                    # Updates with stored classes; could also be from previous frames
+                    track.cls = self.refined.get(track.id, track.cls)
+                    tracks[i] = track
+            else:
+                # In case there are no low conf preds, but still apply refiner.
+                for i, track in enumerate(tracks):
                     # Updates with stored classes; could also be from previous frames
                     track.cls = self.refined.get(track.id, track.cls)
                     tracks[i] = track
@@ -111,4 +127,5 @@ class Refiner:
                 if track.id in self.refined:
                     cls = self.refined[track.id]
                 track.cls = cls
-        return tracks
+
+        return self.out_transform(tracks, img, *args, **kwargs)
