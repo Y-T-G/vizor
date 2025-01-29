@@ -80,9 +80,6 @@ class VLMModel(BaseModel):
             from groq import Groq
 
             return Groq(api_key=api_key, **kwargs)
-        elif api_type == "api2":
-            # Initialize API2 client
-            pass
         else:
             raise ValueError("Unsupported API type")
 
