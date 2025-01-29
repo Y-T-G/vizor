@@ -1,3 +1,3 @@
-from .video import VideoCapture
+from .video import IterableVideoCapture
 
-__all__ = ["VideoCapture"]
+__all__ = ["IterableVideoCapture"]

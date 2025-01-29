@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from lru import LRU
 import numpy as np
 
+
 class BaseModel:
     # Should be marked as abstract class
     def __init__(self, model):
@@ -113,19 +114,19 @@ class Refiner:
                     
         # use crops for secondary inference
         elif self.mode == "instance":
-            for (x1, y1, x2, y2) in tracks.xyxy:
-                # If any track has less that this conf, they will be processed by the secondary model
-                if track.conf > self.min_conf:
-                    continue
-                crop = img[y1:y2, x1:x2]
-                # pred would contain the result from secondary inference
-                pred = self.model.predict(crop)
-                # Update with rectified predictions
-                track.update(pred)
-                # Store the class so that we can map it even without secondary model run
-                self.refined[track.id] = pred.cls
-                if track.id in self.refined:
-                    cls = self.refined[track.id]
+            for i, track in enumerate(tracks):
+                if track.conf <= self.min_conf and track.id not in self.refined:
+                    x1, y1, x2, y2 = track.box.round().astype(int)
+                    crop = img[y1:y2, x1:x2]
+                    # pred would contain the class ID result from secondary inference
+                    pred = int(self.model.predict(crop[...,::-1], **kwargs))
+                    # Update with rectified predictions
+                    # Store the class so that we can map it even without secondary model run
+                    cls = self.refined[track.id] = pred
+                elif track.id in self.refined:
+                    # Get stored class ID for the same box if available
+                    cls = self.refined.get(track.id, track.cls)
                 track.cls = cls
+                tracks[i] = track
 
         return self.out_transform(tracks, img, *args, **kwargs)

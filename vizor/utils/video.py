@@ -1,6 +1,6 @@
 import cv2
 
-class VideoCapture:
+class IterableVideoCapture:
     def __init__(self, cap):
         self.cap = cap
         self.length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
