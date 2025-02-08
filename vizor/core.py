@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from lru import LRU
 import numpy as np
 
-from utils import crop_box
+from .utils import crop_box
 
 
 class BaseModel:
