@@ -28,7 +28,7 @@ class TransformersModel(BaseModel):
         task_prompt="<CAPTION_TO_PHRASE_GROUNDING>",
     ):
         super().__init__()
-        from transformers import AutoProcessor, AutoModelForVision2Seq
+        from transformers import AutoProcessor
         import torch
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -70,17 +70,16 @@ class TransformersModel(BaseModel):
         return text
 
     def predict(self, crop, message, **kwargs):
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image"},
-                    {"type": "text", "text": "Can you describe this image?"},
-                ],
-            },
-        ]
-
         if self.task == "vqa":
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image"},
+                        {"type": "text", "text": "Can you describe this image?"},
+                    ],
+                },
+            ]
             prompt = self.processor.apply_chat_template(
                 messages, add_generation_prompt=True
             )
@@ -97,7 +96,7 @@ class TransformersModel(BaseModel):
         parser_kwargs = (
             dict(image_size=crop.shape[:2][::-1], task=self.task_prompt) if self.task == "causallm" else {}
         )
-        return self.parser(generated_text[0], **parser_kwargs)
+        return self.parser(generated_text, **parser_kwargs)
 
 
 class VLMModel(BaseModel):
