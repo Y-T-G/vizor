@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from lru import LRU
 import numpy as np
 
+from utils import crop_box
+
 
 class BaseModel:
     # Should be marked as abstract class
@@ -81,6 +83,9 @@ class Refiner:
         self.in_transform = in_transform
         self.out_transform = out_transform
 
+        # Instance mode configs
+        self.margin = 10
+
     def run(self, tracks, *args, img=None, preds=None, **kwargs):
         # use the whole image for secondary inference
         tracks = self.in_transform(tracks, *args, **kwargs)
@@ -116,8 +121,7 @@ class Refiner:
         elif self.mode == "instance":
             for i, track in enumerate(tracks):
                 if track.conf <= self.min_conf and track.id not in self.refined:
-                    x1, y1, x2, y2 = track.box.round().astype(int)
-                    crop = img[y1:y2, x1:x2]
+                    crop = crop_box(img, track.box.round().astype(int))
                     # pred would contain the class ID result from secondary inference
                     pred = int(self.model.predict(crop[...,::-1], **kwargs))
                     # Update with rectified predictions

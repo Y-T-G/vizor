@@ -20,20 +20,34 @@ class VLMOutput:
 class TransformersModel(BaseModel):
     """Hugging-Face VLM model."""
 
-    def __init__(self, model):
+    def __init__(self, model, parser=None):
         super().__init__()
         from transformers import AutoProcessor, AutoModelForVision2Seq
         import torch
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.processor = AutoProcessor.from_pretrained(model)
-        self.model = AutoModelForVision2Seq.from_pretrained(
-            model,
-            torch_dtype=torch.bfloat16,
-            _attn_implementation="flash_attention_2"
-            if self.device == "cuda"
-            else "eager",
-        ).to(self.device)
+        try:
+            self.model = AutoModelForVision2Seq.from_pretrained(
+                model,
+                torch_dtype=torch.bfloat16,
+                _attn_implementation="flash_attention_2"
+                if self.device == "cuda"
+                else "eager",
+            ).to(self.device)
+        except ValueError:
+            # Fallback to eager mode if flash_attention_2 is not available
+            self.model = AutoModelForVision2Seq.from_pretrained(
+                model,
+                torch_dtype=torch.bfloat16,
+                _attn_implementation="eager",
+            ).to(self.device)
+
+        if self.parser is not None:
+            self.parser = parser
+
+    def parser(self, text):
+        return text
 
     def predict(self, crop, message, **kwargs):
         messages = [
@@ -58,7 +72,7 @@ class TransformersModel(BaseModel):
             skip_special_tokens=True,
         )
 
-        return generated_texts[0]
+        return self.parser(generated_texts[0])
 
 
 class VLMModel(BaseModel):
