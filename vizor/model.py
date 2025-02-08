@@ -20,31 +20,51 @@ class VLMOutput:
 class TransformersModel(BaseModel):
     """Hugging-Face VLM model."""
 
-    def __init__(self, model, parser=None):
+    def __init__(
+        self,
+        model,
+        task="causallm",
+        parser=None,
+        task_prompt="<CAPTION_TO_PHRASE_GROUNDING>",
+    ):
         super().__init__()
         from transformers import AutoProcessor, AutoModelForVision2Seq
         import torch
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.processor = AutoProcessor.from_pretrained(model)
+        self.dtype = torch.bfloat16 if self.device == "cuda" else torch.float32
+        self.task = task
+        self.processor = AutoProcessor.from_pretrained(model, trust_remote_code=True)
+        if task == "vision2seq":
+            from transformers import AutoModelForVision2Seq as AutoModel
+            self.generate_kwargs = dict(max_new_tokens=500)
+        elif task == "causallm":
+            from transformers import AutoModelForCausalLM as AutoModel
+            self.generate_kwargs = dict(max_new_tokens=1024, num_beams=3)
         try:
-            self.model = AutoModelForVision2Seq.from_pretrained(
+            self.model = AutoModel.from_pretrained(
                 model,
-                torch_dtype=torch.bfloat16,
+                torch_dtype=self.dtype,
                 _attn_implementation="flash_attention_2"
                 if self.device == "cuda"
                 else "eager",
+                trust_remote_code=True,
             ).to(self.device)
         except ValueError:
             # Fallback to eager mode if flash_attention_2 is not available
-            self.model = AutoModelForVision2Seq.from_pretrained(
+            self.model = AutoModel.from_pretrained(
                 model,
-                torch_dtype=torch.bfloat16,
+                torch_dtype=self.dtype,
                 _attn_implementation="eager",
+                trust_remote_code=True,
             ).to(self.device)
 
         if self.parser is not None:
-            self.parser = parser
+            if task == "causallm":
+                self.parser = self.processor.post_process_generation
+                self.task_prompt = task_prompt
+            else:
+                self.parser = parser
 
     def parser(self, text):
         return text
@@ -60,19 +80,24 @@ class TransformersModel(BaseModel):
             },
         ]
 
-        prompt = self.processor.apply_chat_template(
-            messages, add_generation_prompt=True
-        )
+        if self.task == "vqa":
+            prompt = self.processor.apply_chat_template(
+                messages, add_generation_prompt=True
+            )
+        elif self.task == "causallm":
+            prompt = self.task_prompt + message
         inputs = self.processor(text=prompt, images=[crop], return_tensors="pt")
-        inputs = inputs.to(self.device)
+        inputs = inputs.to(self.device, self.dtype)
 
-        generated_ids = self.model.generate(**inputs, max_new_tokens=500)
-        generated_texts = self.processor.batch_decode(
-            generated_ids,
-            skip_special_tokens=True,
+        generated_ids = self.model.generate(**inputs, **self.generate_kwargs)
+        generated_text = self.processor.batch_decode(
+            generated_ids, skip_special_tokens=False if self.task == "causallm" else True
+        )[0]
+
+        parser_kwargs = (
+            dict(image_size=crop.shape[:2][::-1], task=self.task_prompt) if self.task == "causallm" else {}
         )
-
-        return self.parser(generated_texts[0])
+        return self.parser(generated_text[0], **parser_kwargs)
 
 
 class VLMModel(BaseModel):
