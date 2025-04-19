@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from lru import LRU
 import numpy as np
 
-from .utils.image import crop_box
+from .utils.image import crop_box, COLORS
+import cv2
 
 
 class BaseModel:
@@ -28,7 +29,7 @@ class Track:
 class Tracks:
     def __init__(self, tracks):
         """
-        data in [x1,y1,x2,y2,score,label, tid] format
+        data in [x1,y1,x2,y2,score,label,tid] format
         """
         self.data = tracks
 
@@ -58,14 +59,44 @@ class Preds(Tracks):
         data in [x1,y1,x2,y2,score,label] format
         """
         # Add -1 as track id for each prediction
-        self.data = np.column_stack([preds, np.full(len(preds), -1, dtype=preds.dtype)])
+        super().__init__(preds if preds.shape[-1] == 7 else np.column_stack([preds, np.full(len(preds), -1, dtype=preds.dtype)]))
+
+class Outs(Tracks):
+    def __init__(self, outs, classes):
+        """
+        refiner output in [x1,y1,x2,y2,score,label,tid] format
+        """
+        self.data = outs
+        self.classes = classes
     
+    def draw(self, img):
+        for det in self.data:
+            x1, y1, x2, y2, score, label, track_id = det
+            x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
+            color = COLORS[int(label) % len(COLORS)]
+
+            cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+
+            # If self.classes is a list containing label names, use it; otherwise just use the label id.
+            label_name = self.classes[int(label)] if isinstance(self.classes, list) and int(label) < len(self.classes) else str(int(label))
+            text = f"{int(track_id)}:{label_name}:{score:.1f}"
+
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.5
+            thickness = 1
+
+            (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+            cv2.rectangle(img, (x1, y1 - text_height - baseline), (x1 + text_width, y1), color, -1)
+
+            cv2.putText(img, text, (x1, y1 - baseline), font, font_scale, (255, 255, 255), thickness, lineType=cv2.LINE_AA)
+        return img
+
 
 class Refiner:
     # This is the main class to be used for running oomph. Users are expected
     # to provide the primary and secondary models with the required methods and
     # also a tracker with the required method.
-    def __init__(self, model, in_transform, out_transform, conf=0.9, mode="instance"):
+    def __init__(self, model, conf=0.9, mode="instance", classes=None):
         # The model is only used when the conditions for the tracks are met.
         # For example, new tracks should run secondary model for verification
         # of the prediction.
@@ -79,24 +110,34 @@ class Refiner:
         self.min_conf = conf
         # minimum iou used to match secondary detections with primary detections
         self.min_iou = 0.5
+        self.classes = classes
         # Converstion funcs
-        self.in_transform = in_transform
-        self.out_transform = out_transform
+        # self.in_transform = in_transform
+        # self.out_transform = out_transform
+        # self.to_preds = to_preds  # transform secondary model's output to Preds
 
         # Instance mode configs
         self.margin = 10
 
+    def out_transform(self, out, img=None, *args, **kwargs):
+        # transform the output of refiner to Outs
+        return Outs(out.data, self.classes)
+
     def run(self, tracks, *args, img=None, preds=None, **kwargs):
         # use the whole image for secondary inference
-        tracks = self.in_transform(tracks, *args, **kwargs)
+        # tracks = self.in_transform(tracks, *args, **kwargs)
         if self.mode == "image":
             # If any track has less that this conf, they will be processed by the secondary model
             if any([track.conf <= self.min_conf for track in tracks]):
                 # preds would contain the results from secondary inference
                 if preds is None:
-                    preds = Preds(self.model.predict(img)[0].boxes.data.numpy())
+                    preds = self.model.predict(img, **kwargs)
+                    # preds = self.to_preds(preds)
                 # we need to match the secondary results with primary results
-                iou_tracks = 1 - iou_distance(tracks.data[:, :4], preds.data[:, :4])
+                if tracks.data.shape[0] and preds.data.shape[0]:
+                    iou_tracks = 1 - iou_distance(tracks.data[:, :4], preds.data[:, :4])
+                else:
+                    iou_tracks = []
                 for i, iou_track in enumerate(iou_tracks):
                     j = iou_track.argmax() # The IOU of the best matched box
                     track = tracks[i]

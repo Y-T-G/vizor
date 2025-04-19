@@ -1,9 +1,9 @@
 import cv2
 
 class IterableVideoCapture:
-    def __init__(self, cap):
-        self.cap = cap
-        self.length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    def __init__(self, file):
+        self.cap = cv2.VideoCapture(file)
+        self.length = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     def __iter__(self):
         for i in range(self.length):

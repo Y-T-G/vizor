@@ -1,3 +1,12 @@
+COLORS = [
+    (255, 0, 0),    # red
+    (0, 255, 0),    # green
+    (0, 0, 255),    # blue
+    (255, 255, 0),  # cyan
+    (255, 0, 255),  # magenta
+    (0, 255, 255),  # yellow
+]
+
 def crop_box(img, box, border=0.1):
     x1, y1, x2, y2 = box
     box_width, box_height = x2 - x1, y2 - y1

@@ -4,10 +4,27 @@ from abc import ABC, abstractmethod
 class BaseModel(ABC):
     """Abstract base class for models."""
 
-    @abstractmethod
     def predict(self, image):
         """Perform prediction on the given image."""
-        pass
+        raise NotImplementedError
+
+class PrimaryModel(BaseModel):
+    """Abstract base class for primary models."""
+
+    def to_tracks(self, inp):
+        """Transforms the output of primary model to Tracks."""
+        return inp
+
+class SecondaryModel(BaseModel):
+    """Abstract base class for secondary models."""
+
+    def to_preds(preds):
+        """Transforms the output of secondary model to Outs."""
+        raise NotImplementedError
+
+    def out_transform(self, out, *args, **kwarg):
+        """Transforms the output of refiner to Outs."""
+        return out
 
 
 class VLMOutput:
