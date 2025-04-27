@@ -1,7 +1,9 @@
 from powerboxes import iou_distance
 from dataclasses import dataclass
 from lru import LRU
+from collections import deque
 import numpy as np
+import statistics
 
 from .utils.image import crop_box, COLORS
 import cv2
@@ -34,7 +36,10 @@ class Tracks:
         self.data = tracks
 
     def __getitem__(self, idx):
-        return Track(self.data[idx][:4], *self.data[idx][4:7])
+        if isinstance(idx, (slice, list, tuple, np.ndarray)):
+            return [Track(item[:4], *item[4:7]) for item in self.data[idx]]
+        else:
+            return Track(self.data[idx][:4], *self.data[idx][4:7])
 
     def __setitem__(self, idx, track):
         if isinstance(track, Track):
@@ -68,6 +73,8 @@ class Outs(Tracks):
         """
         self.data = outs
         self.classes = classes
+        self.font_scale = 1.0
+        self.thickness = 2
     
     def draw(self, img):
         for det in self.data:
@@ -82,14 +89,31 @@ class Outs(Tracks):
             text = f"{int(track_id)}:{label_name}:{score:.1f}"
 
             font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 0.5
-            thickness = 1
 
-            (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+            (text_width, text_height), baseline = cv2.getTextSize(text, font, self.font_scale, self.thickness)
             cv2.rectangle(img, (x1, y1 - text_height - baseline), (x1 + text_width, y1), color, -1)
 
-            cv2.putText(img, text, (x1, y1 - baseline), font, font_scale, (255, 255, 255), thickness, lineType=cv2.LINE_AA)
+            cv2.putText(img, text, (x1, y1 - baseline), font, self.font_scale, (255, 255, 255), self.thickness, lineType=cv2.LINE_AA)
         return img
+
+class LRUDQ:
+    def __init__(self, *args, **kwargs):
+        """Returns an LRU dict that creates a deque to track history."""
+        self.lru = LRU(*args, **kwargs)
+        self.dq_len = 50
+
+    def __getitem__(self, key):
+        value = self.lru[key] = self.lru.get(key, deque(maxlen=self.dq_len))
+        return value
+
+    def getmode(self, key, default=None):
+        dq = self.get(key, None)
+        if dq:
+            return statistics.mode(dq)
+        return default
+
+    def __getattr__(self, name):
+        return getattr(self.lru, name)
 
 
 class Refiner:
@@ -105,12 +129,13 @@ class Refiner:
         # mode only makes an inference on the individual instances.
         self.mode = mode
         # Keeps track of refined tracks
-        self.refined = LRU(size=100)
+        self.refined = LRUDQ(size=100)
         # minimum confidence to trigger secondary inference
         self.min_conf = conf
         # minimum iou used to match secondary detections with primary detections
         self.min_iou = 0.5
         self.classes = classes
+        self.best = False  # only the best matched IoU box for image mode
         # Converstion funcs
         # self.in_transform = in_transform
         # self.out_transform = out_transform
@@ -123,7 +148,7 @@ class Refiner:
         # transform the output of refiner to Outs
         return Outs(out.data, self.classes)
 
-    def run(self, tracks, *args, img=None, preds=None, **kwargs):
+    def run(self, tracks, *args, img=None, preds=None, frame_id=None, **kwargs):
         # use the whole image for secondary inference
         # tracks = self.in_transform(tracks, *args, **kwargs)
         if self.mode == "image":
@@ -139,23 +164,28 @@ class Refiner:
                 else:
                     iou_tracks = []
                 for i, iou_track in enumerate(iou_tracks):
-                    j = iou_track.argmax() # The IOU of the best matched box
+                    if self.best and iou_track.shape[0]:  # only keep best IoU match
+                        idx = iou_track.argmax()
+                        iou_idxs = [idx] if iou_track[idx] >= self.min_iou else []
+                    else:
+                        iou_idxs = np.arange(iou_track.shape[0])
+                        iou_idxs = iou_idxs[iou_track >= self.min_iou]
                     track = tracks[i]
-                    if iou_track[j] >= self.min_iou:
+                    for j in iou_idxs:
                         # Update with rectified predictions
                         pred = preds[j]
                         track.box = pred.box
                         track.conf = pred.conf
                         # Store the class so that we can map it even without secondary model run
-                        self.refined[track.id] = cls = pred.cls
+                        self.refined[track.id].append(pred.cls)
                     # Updates with stored classes; could also be from previous frames
-                    track.cls = self.refined.get(track.id, track.cls)
+                    track.cls = self.refined.getmode(track.id, track.cls)
                     tracks[i] = track
             else:
                 # In case there are no low conf preds, but still apply refiner.
                 for i, track in enumerate(tracks):
                     # Updates with stored classes; could also be from previous frames
-                    track.cls = self.refined.get(track.id, track.cls)
+                    track.cls = self.refined.getmode(track.id, track.cls)
                     tracks[i] = track
                     
         # use crops for secondary inference
@@ -164,13 +194,13 @@ class Refiner:
                 if track.conf <= self.min_conf and track.id not in self.refined:
                     crop = crop_box(img, track.box.round().astype(int))
                     # pred would contain the class ID result from secondary inference
-                    pred = int(self.model.predict(crop[...,::-1], **kwargs))
+                    cls = pred = int(self.model.predict(crop[...,::-1], **kwargs))
                     # Update with rectified predictions
                     # Store the class so that we can map it even without secondary model run
-                    cls = self.refined[track.id] = pred
+                    self.refined[track.id].append(pred)
                 elif track.id in self.refined:
                     # Get stored class ID for the same box if available
-                    cls = self.refined.get(track.id, track.cls)
+                    cls = self.refined.getmode(track.id, track.cls)
                 track.cls = cls
                 tracks[i] = track
 
