@@ -1,207 +1,99 @@
-from powerboxes import iou_distance
-from dataclasses import dataclass
-from lru import LRU
-from collections import deque
-import numpy as np
-import statistics
+"""The pipeline: a primary detector every frame, a secondary model when needed."""
 
-from .utils.image import crop_box, COLORS
-import cv2
+from .boxes import Tracks
+from .refine import Refiner
+from .utils.video import Video, Writer
+
+__all__ = ["Vizor"]
 
 
-class BaseModel:
-    # Should be marked as abstract class
-    def __init__(self, model):
-        self.model = model
+class Vizor:
+    """Run a fast tracker on every frame and refine it with a slower model.
 
-    def predict(self, img, tracks):
-        # This is a required method that the users are expected to implement for their models.
-        # The input are the tracks obtained from the tracker [x1,y1,x2,y2,conf,class_id,track_id] while the output is the predictions in [x1,y1,x2,y2,conf,class_id,track_id] format.
-        raise NotImplementedError
+    The primary gives boxes and track ids at frame rate. The secondary is only
+    asked about tracks the primary is unsure of, and its answers are cached
+    against the track id, so the cost is paid once per object rather than once
+    per frame.
 
-@dataclass
-class Track:
-    """Tracklet in Vizor refiner format."""
-    box: np.ndarray
-    conf: float
-    cls: int
-    id: int
+    Args:
+        primary: model with a ``track(img)`` method returning :class:`~vizor.boxes.Tracks`.
+        secondary: model with ``find`` (full mode) or ``name`` (crop mode). Optional.
+        conf: tracks at or below this confidence go to the secondary.
+        mode: ``"full"`` runs the secondary on the whole frame, ``"crop"`` on each box.
+        names: class id to name mapping. Defaults to whatever the primary reports.
 
+    Remaining keyword arguments go to :class:`~vizor.refine.Refiner`.
+    """
 
-class Tracks:
-    def __init__(self, tracks):
+    def __init__(self, primary, secondary=None, conf=0.5, mode="full", names=None, **kw):
+        self.primary = primary
+        self.refiner = Refiner(secondary, conf=conf, mode=mode, names=names, **kw)
+
+    @property
+    def secondary(self):
+        return self.refiner.model
+
+    @property
+    def names(self):
+        return self.refiner.names or getattr(self.primary, "names", None)
+
+    def reset(self):
+        """Clear the vote cache and any state the primary keeps between frames."""
+        self.refiner.reset()
+        reset = getattr(self.primary, "reset", None)
+        if callable(reset):
+            reset()
+
+    def step(self, img, preds=None):
+        """Process one frame and return the refined :class:`~vizor.boxes.Tracks`."""
+        tracks = self.primary.track(img)
+        if not isinstance(tracks, Tracks):
+            tracks = Tracks(tracks)
+        if tracks.names is None:
+            tracks.names = getattr(self.primary, "names", None)
+        return self.refiner.run(tracks, img=img, preds=preds)
+
+    def run(self, src, save=None, show=False, fourcc="mp4v"):
+        """Yield refined tracks for every frame of ``src``.
+
+        ``src`` is anything :class:`~vizor.utils.video.Video` opens: a file path,
+        a camera index, or a stream url. Pass ``save`` to also write an annotated
+        video, and ``show`` to display it in a window.
+
+        Each yielded ``Tracks`` carries its frame, so ``out.draw()`` needs no
+        argument. Drawing happens on the frame itself, so copy it first if you
+        want the original.
         """
-        data in [x1,y1,x2,y2,score,label,tid] format
-        """
-        self.data = tracks
+        video = Video(src)
+        writer = Writer(save, fps=video.fps, fourcc=fourcc) if save else None
+        try:
+            for frame in video:
+                out = self.step(frame)
+                yield out
+                if writer or show:
+                    drawn = out.draw(frame)
+                    if writer:
+                        writer.write(drawn)
+                    if show:
+                        import cv2
 
-    def __getitem__(self, idx):
-        if isinstance(idx, (slice, list, tuple, np.ndarray)):
-            return [Track(item[:4], *item[4:7]) for item in self.data[idx]]
-        else:
-            return Track(self.data[idx][:4], *self.data[idx][4:7])
+                        cv2.imshow("vizor", drawn)
+                        if cv2.waitKey(1) & 0xFF in (27, ord("q")):
+                            break
+        finally:
+            video.close()
+            if writer:
+                writer.close()
+            if show:
+                import cv2
 
-    def __setitem__(self, idx, track):
-        if isinstance(track, Track):
-            self.data[idx] = [*track.box, track.conf, track.cls, track.id]
-        else:
-            self.data[idx] = track
+                try:
+                    cv2.destroyWindow("vizor")
+                except cv2.error:
+                    pass
 
-    def __len__(self):
-        return len(self.data)
-
-    def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
-
-    def __repr__(self):
-        return str(list(self))
-
-
-class Preds(Tracks):
-    def __init__(self, preds):
-        """
-        data in [x1,y1,x2,y2,score,label] format
-        """
-        # Add -1 as track id for each prediction
-        super().__init__(preds if preds.shape[-1] == 7 else np.column_stack([preds, np.full(len(preds), -1, dtype=preds.dtype)]))
-
-class Outs(Tracks):
-    def __init__(self, outs, classes):
-        """
-        refiner output in [x1,y1,x2,y2,score,label,tid] format
-        """
-        self.data = outs
-        self.classes = classes
-        self.font_scale = 1.0
-        self.thickness = 2
-    
-    def draw(self, img):
-        for det in self.data:
-            x1, y1, x2, y2, score, label, track_id = det
-            x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
-            color = COLORS[int(label) % len(COLORS)]
-
-            cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
-
-            # If self.classes is a list containing label names, use it; otherwise just use the label id.
-            label_name = self.classes[int(label)] if isinstance(self.classes, list) and int(label) < len(self.classes) else str(int(label))
-            text = f"{int(track_id)}:{label_name}:{score:.1f}"
-
-            font = cv2.FONT_HERSHEY_SIMPLEX
-
-            (text_width, text_height), baseline = cv2.getTextSize(text, font, self.font_scale, self.thickness)
-            cv2.rectangle(img, (x1, y1 - text_height - baseline), (x1 + text_width, y1), color, -1)
-
-            cv2.putText(img, text, (x1, y1 - baseline), font, self.font_scale, (255, 255, 255), self.thickness, lineType=cv2.LINE_AA)
-        return img
-
-class LRUDQ:
-    def __init__(self, *args, **kwargs):
-        """Returns an LRU dict that creates a deque to track history."""
-        self.lru = LRU(*args, **kwargs)
-        self.dq_len = 50
-
-    def __getitem__(self, key):
-        value = self.lru[key] = self.lru.get(key, deque(maxlen=self.dq_len))
-        return value
-
-    def getmode(self, key, default=None):
-        dq = self.get(key, None)
-        if dq:
-            return statistics.mode(dq)
-        return default
-
-    def __getattr__(self, name):
-        return getattr(self.lru, name)
-
-
-class Refiner:
-    # This is the main class to be used for running oomph. Users are expected
-    # to provide the primary and secondary models with the required methods and
-    # also a tracker with the required method.
-    def __init__(self, model, conf=0.9, mode="instance", classes=None):
-        # The model is only used when the conditions for the tracks are met.
-        # For example, new tracks should run secondary model for verification
-        # of the prediction.
-        self.model = model
-        # "image" mode makes an inference on the whole image and "instance"
-        # mode only makes an inference on the individual instances.
-        self.mode = mode
-        # Keeps track of refined tracks
-        self.refined = LRUDQ(size=100)
-        # minimum confidence to trigger secondary inference
-        self.min_conf = conf
-        # minimum iou used to match secondary detections with primary detections
-        self.min_iou = 0.5
-        self.classes = classes
-        self.best = False  # only the best matched IoU box for image mode
-        # Converstion funcs
-        # self.in_transform = in_transform
-        # self.out_transform = out_transform
-        # self.to_preds = to_preds  # transform secondary model's output to Preds
-
-        # Instance mode configs
-        self.margin = 10
-
-    def out_transform(self, out, img=None, *args, **kwargs):
-        # transform the output of refiner to Outs
-        return Outs(out.data, self.classes)
-
-    def run(self, tracks, *args, img=None, preds=None, frame_id=None, **kwargs):
-        # use the whole image for secondary inference
-        # tracks = self.in_transform(tracks, *args, **kwargs)
-        if self.mode == "image":
-            # If any track has less that this conf, they will be processed by the secondary model
-            if any([track.conf <= self.min_conf for track in tracks]):
-                # preds would contain the results from secondary inference
-                if preds is None:
-                    preds = self.model.predict(img, **kwargs)
-                    # preds = self.to_preds(preds)
-                # we need to match the secondary results with primary results
-                if tracks.data.shape[0] and preds.data.shape[0]:
-                    iou_tracks = 1 - iou_distance(tracks.data[:, :4], preds.data[:, :4])
-                else:
-                    iou_tracks = []
-                for i, iou_track in enumerate(iou_tracks):
-                    if self.best and iou_track.shape[0]:  # only keep best IoU match
-                        idx = iou_track.argmax()
-                        iou_idxs = [idx] if iou_track[idx] >= self.min_iou else []
-                    else:
-                        iou_idxs = np.arange(iou_track.shape[0])
-                        iou_idxs = iou_idxs[iou_track >= self.min_iou]
-                    track = tracks[i]
-                    for j in iou_idxs:
-                        # Update with rectified predictions
-                        pred = preds[j]
-                        track.box = pred.box
-                        track.conf = pred.conf
-                        # Store the class so that we can map it even without secondary model run
-                        self.refined[track.id].append(pred.cls)
-                    # Updates with stored classes; could also be from previous frames
-                    track.cls = self.refined.getmode(track.id, track.cls)
-                    tracks[i] = track
-            else:
-                # In case there are no low conf preds, but still apply refiner.
-                for i, track in enumerate(tracks):
-                    # Updates with stored classes; could also be from previous frames
-                    track.cls = self.refined.getmode(track.id, track.cls)
-                    tracks[i] = track
-                    
-        # use crops for secondary inference
-        elif self.mode == "instance":
-            for i, track in enumerate(tracks):
-                if track.conf <= self.min_conf and track.id not in self.refined:
-                    crop = crop_box(img, track.box.round().astype(int))
-                    # pred would contain the class ID result from secondary inference
-                    cls = pred = int(self.model.predict(crop[...,::-1], **kwargs))
-                    # Update with rectified predictions
-                    # Store the class so that we can map it even without secondary model run
-                    self.refined[track.id].append(pred)
-                elif track.id in self.refined:
-                    # Get stored class ID for the same box if available
-                    cls = self.refined.getmode(track.id, track.cls)
-                track.cls = cls
-                tracks[i] = track
-
-        return self.out_transform(tracks, img, *args, **kwargs)
+    def save(self, src, out, show=False):
+        """Run over ``src`` and write the annotated video to ``out``."""
+        for _ in self.run(src, save=out, show=show):
+            pass
+        return out

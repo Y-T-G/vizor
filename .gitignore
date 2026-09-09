@@ -150,3 +150,14 @@ checklink/cookies.txt
 
 # Quarto
 .quarto
+
+# Media and weights kept next to the notebooks for local runs
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.pt
+*.pkl
+*.onnx
+*.engine
+nbs/oomph/
