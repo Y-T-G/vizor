@@ -2,7 +2,7 @@
 
 The vote cache is keyed on the track id, so it is only as good as the tracker. If
 the tracker swaps ids between two nearby objects, the refined class follows the id
-and lands on the wrong object. Raising `hist` makes a single bad frame matter
+and ends up on the wrong object. Raising `hist` makes a single bad frame matter
 less, but it does not fix an id swap.
 
 Untracked boxes all carry `id = -1`, so the cache skips them. They are refined on

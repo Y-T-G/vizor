@@ -1,5 +1,41 @@
 # How it works
 
+```mermaid
+flowchart LR
+    P["primary
+    detect and track
+    every frame"]
+    G{"confident
+    enough?"}
+    H{"voted on this
+    track id before?"}
+    S["secondary VLM
+    the doubtful crops,
+    chunk per request"]
+    C[("vote cache
+    track id to classes")]
+    A["write the class"]
+
+    P -- "boxes, ids" --> G
+    G -- "yes" --> A
+    G -- "no" --> H
+    H -- "yes, every later frame" --> A
+    H -- "no, once per object" --> S
+    S -- "one vote per crop" --> C
+    C -- "majority" --> A
+    H -. "lookup" .-> C
+
+    classDef vlm stroke:#d97706,stroke-width:3px
+    classDef store stroke:#16a34a,stroke-width:2px
+    class S vlm
+    class C store
+    linkStyle 4,5,6 stroke:#d97706,stroke-width:2px
+```
+
+Only the amber box costs real time, and only the bottom path reaches it. A track
+takes that path on the frame it first looks doubtful and never again, because the
+answer is filed under its id.
+
 Each frame goes through three steps.
 
 1. The primary detects and tracks. You get boxes, confidences, classes and track ids.

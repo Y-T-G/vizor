@@ -125,7 +125,7 @@ class Florence(HF):
         self.task = task
 
     def _lookup(self, names):
-        """Name to id, lowercased, so 'Car' and 'car' both land on the same id."""
+        """Name to id, lowercased, so 'Car' and 'car' both map to the same id."""
         names = names if names is not None else self.names
         if names is None:
             return {}

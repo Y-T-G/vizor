@@ -11,22 +11,21 @@
 [Install](#install) · [Quick start](#quick-start) · [How it works](#how-it-works) ·
 [API](#api) · [Write your own](#writing-your-own-model) · [Docs](https://y-t-g.github.io/vizor/)
 
-A small detector is fast enough to run on every frame but gets classes wrong. A
-vision-language model gets them right but is far too slow to run on every frame,
-and often gives you no boxes at all. Vizor runs both and keeps the useful half of
-each: boxes and track ids come from the detector, class labels come from the VLM,
-and every VLM answer is cached against the track id so the same object is never
-asked about twice.
+A small detector runs on every frame but gets classes wrong. A vision-language
+model gets them right but is too slow for every frame, and often returns no boxes
+at all. Vizor runs both. Boxes and track ids come from the detector, class labels
+come from the VLM, and each VLM answer is cached against the track id, so an
+object is only sent to the VLM once.
 
 Full documentation is at [y-t-g.github.io/vizor](https://y-t-g.github.io/vizor/).
 Everything below runs from this repo, and `examples/` holds each snippet as a
 script you can run.
 
-|  | Boxes on every frame | Labels you can trust | Cost per object |
+|  | Boxes every frame | Class labels come from | Cost per object |
 | --- | --- | --- | --- |
-| Small detector alone | yes | often wrong | one cheap call per frame |
-| VLM alone | no boxes, or slow ones | yes | one slow call per frame |
-| **vizor** | yes | yes, once the vote lands | **one slow call per object** |
+| Small detector alone | yes | the detector | one cheap call per frame |
+| VLM alone | no, or slow ones | the VLM | one slow call per frame |
+| vizor | yes | the VLM | one slow call per object |
 
 ## Install
 
@@ -104,6 +103,42 @@ That runs the refiner over the saved frames and writes an annotated video, so yo
 can see what the refinement does without loading a model or spending a call.
 
 ## How it works
+
+```mermaid
+flowchart LR
+    P["primary
+    detect and track
+    every frame"]
+    G{"confident
+    enough?"}
+    H{"voted on this
+    track id before?"}
+    S["secondary VLM
+    the doubtful crops,
+    chunk per request"]
+    C[("vote cache
+    track id to classes")]
+    A["write the class"]
+
+    P -- "boxes, ids" --> G
+    G -- "yes" --> A
+    G -- "no" --> H
+    H -- "yes, every later frame" --> A
+    H -- "no, once per object" --> S
+    S -- "one vote per crop" --> C
+    C -- "majority" --> A
+    H -. "lookup" .-> C
+
+    classDef vlm stroke:#d97706,stroke-width:3px
+    classDef store stroke:#16a34a,stroke-width:2px
+    class S vlm
+    class C store
+    linkStyle 4,5,6 stroke:#d97706,stroke-width:2px
+```
+
+Only the amber box costs real time, and only the bottom path reaches it. A track
+takes that path on the frame it first looks doubtful and never again, because the
+answer is filed under its id.
 
 Each frame goes through three steps.
 
@@ -203,32 +238,10 @@ Images handed to your model are BGR, the layout OpenCV gives you. Convert inside
 your wrapper if the model wants RGB. `name` returns a class id, or `None` if the
 model is not sure, and `None` records no vote.
 
-## Caveats
-
-The vote cache is keyed on the track id, so it is only as good as the tracker. If
-the tracker swaps ids between two nearby objects, the refined class follows the id
-and lands on the wrong object. Raising `hist` makes a single bad frame matter less
-but does not fix an id swap.
-
-Untracked boxes all carry `id = -1`, so the cache skips them. They are refined on
-the frame they appear on and never remembered.
-
-Florence-2 reports no confidence, so every box it returns comes back at 1.0. In
-full mode that overwrites the primary's confidence with a number that means
-nothing. Set `best=False` if you would rather every matching box vote instead of
-only the highest-IoU one, but the confidence problem stays.
-
-Crop mode batches, but only as far as one frame goes. `VLM` puts up to `chunk`
-crops in a single request, and everything else falls back to one call per crop.
-On the traffic clip that turns 569 crops into 528 requests at `votes=1`, a saving
-of about 7 percent, because the vote cache has already removed most of the work.
-The batches only get big when a lot of new objects appear at once. Raising
-`votes` helps more, 2077 crops in 1632 requests at `votes=5`. Nothing batches
-across frames, and `HF` does not batch at all yet.
-
 ## Links
 
 - [Full documentation](https://y-t-g.github.io/vizor/), built from the docstrings
+- [Caveats](https://y-t-g.github.io/vizor/caveats/), what this does badly and where it breaks
 - [Ultralytics](https://docs.ultralytics.com/) for the detector and trackers used in `examples/yolo.py`
 - [Florence-2](https://huggingface.co/microsoft/Florence-2-base-ft) for open-vocabulary grounding
 - [OpenAI](https://platform.openai.com/docs/guides/vision) and [Gemini](https://ai.google.dev/gemini-api/docs/openai) for hosted vision models
