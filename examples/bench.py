@@ -37,12 +37,15 @@ def full(conf):
     boxes = changed = 0
     took = 0.0
     for _ in range(len(primary)):
+        # column 6 of the raw ultralytics row is the class, read before step()
+        # advances the pickle, so it is the label the primary would have kept
         before = np.asarray(primary.frames[primary.i], np.float32)[:, 6].astype(int)
         start = time.perf_counter()
-        out = viz.step(None)
+        out = viz.step(None)  # img is None because Pkl ignores it
         took += time.perf_counter() - start
         boxes += len(out)
         changed += int((out.cls != before).sum())
+    # ms/frame here is the refiner alone, the IoU match and the vote lookup
     return boxes, changed, took / len(primary)
 
 
@@ -50,10 +53,13 @@ def crop(conf):
     primary = Pkl(PRIMARY, cols=Pkl.ULTRALYTICS, names=NAMES)
     counter = Counter()
     viz = Vizor(primary, counter, names=NAMES, conf=conf, mode="crop", votes=1, size=512)
+    # crop mode cuts the box out of the frame, so it needs a real array to cut from
     frame = np.zeros((720, 1280, 3), np.uint8)
     low = 0
     for _ in range(len(primary)):
         low += int((viz.step(frame).conf <= conf).sum())
+    # low counts every doubtful box across the video, calls counts how many
+    # survived the cache. The gap between them is what the vote cache saves.
     return low, counter.calls
 
 

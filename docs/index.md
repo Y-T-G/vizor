@@ -35,8 +35,13 @@ part of the installed package.
 import vizor as vz
 from yolo import YOLO
 
+# YOLO detects and tracks every frame. The VLM only sees boxes YOLO scored at or
+# below conf, cropped out one at a time, and its answer is cached against the
+# track id, so each object costs one call no matter how long it stays in view.
 viz = vz.Vizor(YOLO("yolo11n.pt"), vz.VLM("gpt-4o-mini"), conf=0.5, mode="crop")
 
+# run() yields the refined boxes for each frame and writes the annotated video
+# as it goes. Drop save= and nothing is written.
 for out in viz.run("traffic.mp4", save="out.mp4"):
     print(len(out), "boxes")
 ```
@@ -52,10 +57,15 @@ pass.
 import vizor as vz
 from yolo import YOLO
 
+# the class list is Florence's prompt, so it looks for these three and nothing else
 names = {0: "person", 2: "car", 7: "truck"}
+
+# full mode grounds the whole frame in one pass, then matches Florence's boxes to
+# the tracks by IoU. A match overwrites the box and confidence, not just the class.
 viz = vz.Vizor(YOLO("yolo11n.pt"), vz.Florence(names=names), conf=0.5, mode="full")
 
-for out in viz.run(0, show=True):   # 0 is the first webcam
+# 0 is the first webcam. show=True opens a window, q or Esc closes it.
+for out in viz.run(0, show=True):
     pass
 ```
 
@@ -71,11 +81,12 @@ carry `id = -1`.
 
 ```python
 out.data              # the raw (N, 7) array
-out.boxes             # (N, 4) xyxy
-out.conf, out.cls, out.ids
-out[0]                # a single Track
-out[out.conf > 0.8]   # a copy holding the rows that match
-out.draw()            # annotate the frame it came from and return it
+out.boxes             # (N, 4) xyxy, a view, so writing to it edits data
+out.conf              # (N,) confidences, also a view
+out.cls, out.ids      # (N,) ints, copies, so writing to them changes nothing
+out[0]                # one Track
+out[out.conf > 0.8]   # a new Tracks holding a copy of the matching rows
+out.draw()            # draw the boxes on the frame it came from, return the image
 ```
 
 Indexing with an int gives one [`Track`][vizor.boxes.Track]. Indexing with a mask

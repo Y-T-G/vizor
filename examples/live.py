@@ -32,15 +32,18 @@ def main():
     ap.add_argument("--show", action="store_true")
     args = ap.parse_args()
 
+    # a bare number means a camera index, anything else is a path or a url
     source = int(args.source) if args.source.isdigit() else args.source
     viz = Vizor(
-        YOLO(args.weights),
-        VLM(args.model, api=args.api),
+        YOLO(args.weights),           # runs on every frame
+        VLM(args.model, api=args.api),  # runs only on boxes at or below --conf
         conf=args.conf,
-        mode="crop",
-        votes=args.votes,
+        mode="crop",                  # send the cropped box, not the whole frame
+        votes=args.votes,             # stop asking about a track after this many answers
     )
 
+    # the cache size is how many distinct objects have cost a VLM call so far,
+    # so it climbs far slower than the frame count
     for out in viz.run(source, save=args.save, show=args.show):
         print(f"{len(out)} boxes, {len(viz.refiner.cache)} tracks refined", end="\r")
 

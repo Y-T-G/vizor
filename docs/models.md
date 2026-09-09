@@ -26,7 +26,11 @@ single integer back.
 ```python
 import vizor as vz
 
+# api="groq" picks the Groq endpoint and reads the key from GROQ_API_KEY
 groq = vz.VLM("meta-llama/llama-4-scout-17b-16e-instruct", api="groq")
+
+# url= points at any OpenAI-compatible server, such as vLLM or llama.cpp. Those
+# usually ignore the key, but the client still needs one, hence key="none".
 local = vz.VLM("qwen2.5-vl-7b", url="http://localhost:8000/v1", key="none")
 ```
 
@@ -44,6 +48,7 @@ returned labels back to class ids, case insensitively.
 import vizor as vz
 from yolo import YOLO
 
+# these names are the grounding prompt, so Florence returns boxes for them only
 names = {0: "person", 2: "car", 7: "truck"}
 viz = vz.Vizor(YOLO("yolo11n.pt"), vz.Florence(names=names), mode="full")
 ```
@@ -59,8 +64,14 @@ model loaded and no API calls.
 ```python
 import vizor as vz
 
+# saved ultralytics output, reindexed into [x1, y1, x2, y2, conf, cls, id]
 primary = vz.Pkl("tracks.pkl", cols=vz.Pkl.ULTRALYTICS)
+
+# already in vizor order, so no reindex
 secondary = vz.Pkl("florence.pkl")
+
+# each call hands out the next saved frame, so the two files have to line up
+# with each other and with the video they came from
 viz = vz.Vizor(primary, secondary, conf=0.5, mode="full")
 ```
 
@@ -78,10 +89,13 @@ import numpy as np
 from vizor import Model, Tracks
 
 class MyDetector(Model):
+    # turns class ids into labels when drawing, and becomes the menu the VLM picks from
     names = {0: "person", 1: "car"}
 
     def track(self, img):
-        # your model here, returning [x1, y1, x2, y2, conf, cls, id] rows
+        # img is BGR, the layout OpenCV hands you. Return one row per object as
+        # [x1, y1, x2, y2, conf, cls, id], with id = -1 for anything untracked.
+        # An untracked row is refined on this frame and never cached.
         return Tracks(np.zeros((0, 7), np.float32), names=self.names)
 ```
 

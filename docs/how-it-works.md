@@ -21,6 +21,8 @@ tracks by IoU, and takes its box, confidence and class. Use it when the secondar
 localises, so Florence-2, a heavier YOLO, or any open-vocabulary detector.
 
 ```python
+# a secondary box must overlap a track by iou=0.5 or more to count as the same
+# object. Below that the track keeps whatever the primary gave it.
 viz = vz.Vizor(primary, vz.Florence(names=names), conf=0.5, mode="full", iou=0.5)
 ```
 
@@ -33,6 +35,8 @@ changes. Use it when the secondary classifies but does not localise, which is
 every chat VLM.
 
 ```python
+# votes=1 means one call per track for its whole life. Raise it to keep asking
+# until that many answers are in, which costs more calls but survives a bad one.
 viz = vz.Vizor(primary, vz.VLM("gpt-4o-mini"), conf=0.5, mode="crop", votes=1)
 ```
 
@@ -51,11 +55,11 @@ deque of class ids, and the winner is the most common entry.
 ```python
 from vizor import Vote
 
-v = Vote(size=256, hist=25)
-v.add(7, 2)
-v.add(7, 2)
-v.add(7, 5)
-v.get(7)   # 2
+v = Vote(size=256, hist=25)   # remember 256 track ids, up to 25 votes each
+v.add(7, 2)                   # the secondary called track 7 a class 2
+v.add(7, 2)                   # and again
+v.add(7, 5)                   # then once a class 5
+v.get(7)                      # 2, the majority, so one odd answer does not win
 ```
 
 `size` caps how many track ids are remembered at once, and the least recently
