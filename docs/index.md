@@ -35,7 +35,7 @@ part of the installed package. [Licensing](models.md#licensing) explains why.
 import vizor as vz
 from yolo import YOLO
 
-viz = vz.Vizor(YOLO("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), conf=0.5, mode="crop")
+viz = vz.Vizor(YOLO("yolo11n.pt"), vz.VLM("gpt-4o-mini"), conf=0.5, mode="crop")
 
 for out in viz.run("traffic.mp4", save="out.mp4"):
     print(len(out), "boxes")

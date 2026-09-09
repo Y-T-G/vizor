@@ -39,7 +39,7 @@ comes from `examples/yolo.py`, not from `vizor`:
 import vizor as vz
 from yolo import YOLO
 
-viz = vz.Vizor(YOLO("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), conf=0.5, mode="crop")
+viz = vz.Vizor(YOLO("yolo11n.pt"), vz.VLM("gpt-4o-mini"), conf=0.5, mode="crop")
 
 for out in viz.run("traffic.mp4", save="out.mp4"):
     print(len(out), "boxes")
@@ -137,7 +137,7 @@ Indexing with an int gives you one `Track`. Indexing with a mask or a slice give
 you a new `Tracks`, and because numpy copies on fancy indexing, writing to it does
 not touch the original.
 
-Bundled models: `Vlm` (OpenAI, Groq, or any OpenAI-compatible url), `Hf` (a local
+Bundled models: `VLM` (OpenAI, Groq, or any OpenAI-compatible url), `HF` (a local
 transformers chat VLM), `Florence` (Florence-2 as an open-vocabulary detector),
 `Pkl` (replay saved predictions). All of them are secondaries. The primary is
 yours to bring.

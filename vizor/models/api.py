@@ -7,12 +7,12 @@ import cv2
 
 from .base import PROMPT, Model, ids, menu, parse_id
 
-__all__ = ["Vlm"]
+__all__ = ["VLM"]
 
 ENV = {"openai": "OPENAI_API_KEY", "groq": "GROQ_API_KEY"}
 
 
-class Vlm(Model):
+class VLM(Model):
     """A hosted vision model asked to classify one crop at a time.
 
     These models describe an image well but do not give boxes, so use them with

@@ -7,7 +7,7 @@
         print(out)
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from .boxes import Preds, Track, Tracks, iou
 from .core import Vizor
@@ -19,11 +19,11 @@ __all__ = [
     "Vizor", "Refiner", "Vote",
     "Track", "Tracks", "Preds", "iou",
     "Video", "Writer",
-    "Model", "Vlm", "Hf", "Florence", "Pkl",
+    "Model", "VLM", "HF", "Florence", "Pkl",
     "__version__",
 ]
 
-_MODELS = {"Model", "Vlm", "Hf", "Florence", "Pkl"}
+_MODELS = {"Model", "VLM", "HF", "Florence", "Pkl"}
 
 
 def __getattr__(name):

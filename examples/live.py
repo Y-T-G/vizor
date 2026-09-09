@@ -17,7 +17,7 @@ import argparse
 
 from yolo import YOLO
 
-from vizor import Vizor, Vlm
+from vizor import VLM, Vizor
 
 
 def main():
@@ -35,7 +35,7 @@ def main():
     source = int(args.source) if args.source.isdigit() else args.source
     viz = Vizor(
         YOLO(args.weights),
-        Vlm(args.model, api=args.api),
+        VLM(args.model, api=args.api),
         conf=args.conf,
         mode="crop",
         votes=args.votes,
