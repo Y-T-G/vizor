@@ -1,5 +1,16 @@
 # vizor
 
+[![PyPI](https://img.shields.io/pypi/v/vizor?color=007ec6&label=pypi)](https://pypi.org/project/vizor/)
+[![Python](https://img.shields.io/badge/python-3.9%2B-007ec6)](https://pypi.org/project/vizor/)
+[![License](https://img.shields.io/pypi/l/vizor?color=007ec6)](LICENSE)
+[![CI](https://github.com/Y-T-G/vizor/actions/workflows/test.yaml/badge.svg)](https://github.com/Y-T-G/vizor/actions/workflows/test.yaml)
+[![Docs](https://img.shields.io/badge/docs-y--t--g.github.io%2Fvizor-007ec6)](https://y-t-g.github.io/vizor/)
+
+**A fast detector kept honest by a slower, smarter one.**
+
+[Install](#install) · [Quick start](#quick-start) · [How it works](#how-it-works) ·
+[API](#api) · [Write your own](#writing-your-own-model) · [Docs](https://y-t-g.github.io/vizor/)
+
 A small detector is fast enough to run on every frame but gets classes wrong. A
 vision-language model gets them right but is far too slow to run on every frame,
 and often gives you no boxes at all. Vizor runs both and keeps the useful half of
@@ -10,6 +21,12 @@ asked about twice.
 Full documentation is at [y-t-g.github.io/vizor](https://y-t-g.github.io/vizor/).
 Everything below runs from this repo, and `examples/` holds each snippet as a
 script you can run.
+
+|  | Boxes on every frame | Labels you can trust | Cost per object |
+| --- | --- | --- | --- |
+| Small detector alone | yes | often wrong | one cheap call per frame |
+| VLM alone | no boxes, or slow ones | yes | one slow call per frame |
+| **vizor** | yes | yes, once the vote lands | **one slow call per object** |
 
 ## Install
 
@@ -147,10 +164,14 @@ Indexing with an int gives you one `Track`. Indexing with a mask or a slice give
 you a new `Tracks`, and because numpy copies on fancy indexing, writing to it does
 not touch the original.
 
-Bundled models: `VLM` (OpenAI, Groq, or any OpenAI-compatible url), `HF` (a local
-transformers chat VLM), `Florence` (Florence-2 as an open-vocabulary detector),
-`Pkl` (replay saved predictions). All of them are secondaries. The primary is
-yours to bring.
+Bundled models, all of them secondaries. The primary is yours to bring.
+
+| Model | What it is | Mode | Extra |
+| --- | --- | --- | --- |
+| `VLM` | any OpenAI-compatible chat endpoint, so OpenAI, Groq or Gemini | `crop` | `api` or `groq` |
+| `HF` | a local transformers chat VLM | `crop` | `hf` |
+| `Florence` | Florence-2 as an open-vocabulary detector | `full` | `hf` |
+| `Pkl` | replays predictions you saved earlier | either | none |
 
 ## Writing your own model
 
@@ -203,6 +224,7 @@ across frames, and `HF` does not batch at all yet.
 
 ## Links
 
+- [Full documentation](https://y-t-g.github.io/vizor/), built from the docstrings
 - [Ultralytics](https://docs.ultralytics.com/) for the detector and trackers used in `examples/yolo.py`
 - [Florence-2](https://huggingface.co/microsoft/Florence-2-base-ft) for open-vocabulary grounding
-- [Groq](https://console.groq.com/docs) and [OpenAI](https://platform.openai.com/docs/guides/vision) for hosted vision models
+- [OpenAI](https://platform.openai.com/docs/guides/vision), [Groq](https://console.groq.com/docs) and [Gemini](https://ai.google.dev/gemini-api/docs/openai) for hosted vision models
