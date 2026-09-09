@@ -33,6 +33,7 @@ class Video:
         return max(0, self.n)
 
     def close(self):
+        """Release the capture. Safe to call twice."""
         if self.cap is not None:
             self.cap.release()
             self.cap = None
@@ -60,6 +61,7 @@ class Writer:
         self.out = None
 
     def write(self, img):
+        """Write one BGR frame, opening the file on the first call to read its size."""
         if self.out is None:
             h, w = img.shape[:2]
             code = cv2.VideoWriter_fourcc(*self.fourcc)
@@ -69,6 +71,7 @@ class Writer:
         self.out.write(img)
 
     def close(self):
+        """Release the writer and finish the file. Safe to call twice."""
         if self.out is not None:
             self.out.release()
             self.out = None

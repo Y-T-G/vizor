@@ -51,9 +51,11 @@ class Vote:
         return len(dq) if dq else 0
 
     def drop(self, id):
+        """Forget one track id. Does nothing if it was never seen."""
         self.data.pop(int(id), None)
 
     def clear(self):
+        """Forget every track id."""
         self.data.clear()
 
     def __contains__(self, id):

@@ -29,9 +29,11 @@ hf = ["torch>=2.0", "transformers>=4.40", "pillow>=9.0", "einops", "timm"]
 api = ["openai>=1.0"]
 groq = ["groq>=0.11"]
 dev = ["pytest>=7", "ruff>=0.5"]
+docs = ["mkdocs-material>=9.5", "mkdocstrings[python]>=0.25"]
 
 [project.urls]
 Homepage = "https://github.com/Y-T-G/vizor"
+Documentation = "https://y-t-g.github.io/vizor/"
 Issues = "https://github.com/Y-T-G/vizor/issues"
 
 [tool.setuptools.dynamic]

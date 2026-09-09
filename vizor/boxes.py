@@ -55,10 +55,12 @@ class Track:
 
     @property
     def wh(self):
+        """Width and height of the box."""
         return self.box[2] - self.box[0], self.box[3] - self.box[1]
 
     @property
     def area(self):
+        """Box area in pixels, clamped at zero for an inverted box."""
         w, h = self.wh
         return max(0.0, float(w)) * max(0.0, float(h))
 
@@ -78,18 +80,22 @@ class Tracks:
     # column views ---------------------------------------------------------
     @property
     def boxes(self):
+        """View of the ``(N, 4)`` xyxy columns. Writes go through to ``data``."""
         return self.data[:, :4]
 
     @property
     def conf(self):
+        """View of the ``(N,)`` confidence column."""
         return self.data[:, 4]
 
     @property
     def cls(self):
+        """Class ids as ``(N,)`` int. This is a copy, so writes do not go through."""
         return self.data[:, 5].astype(int)
 
     @property
     def ids(self):
+        """Track ids as ``(N,)`` int, ``-1`` where untracked. A copy, like ``cls``."""
         return self.data[:, 6].astype(int)
 
     # sequence protocol ----------------------------------------------------
@@ -124,6 +130,7 @@ class Tracks:
         return label(self.names, cls)
 
     def copy(self):
+        """A deep copy of the rows, sharing the names mapping and the source frame."""
         return type(self)(self.data.copy(), self.names, self.img)
 
     def draw(self, img=None, scale=None, thick=None):

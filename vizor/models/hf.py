@@ -1,5 +1,7 @@
 """Local vision-language models from Hugging Face."""
 
+from typing import Any
+
 import numpy as np
 
 from ..boxes import Preds
@@ -33,7 +35,15 @@ class Hf(Model):
 
     kind = "chat"
 
-    def __init__(self, model, device=None, dtype=None, prompt=None, gen=None, **kw):
+    def __init__(
+        self,
+        model: str,
+        device: "str | None" = None,
+        dtype: "str | None" = None,
+        prompt: "str | None" = None,
+        gen: "dict[str, Any] | None" = None,
+        **kw: Any,
+    ):
         import torch
         from transformers import AutoProcessor
 
@@ -80,6 +90,7 @@ class Hf(Model):
         return self.processor.batch_decode(out, skip_special_tokens=True)[0].strip()
 
     def name(self, crop, names=None, hint=None):
+        """Ask the model which class the crop is. Returns a class id, or None if unsure."""
         names = names if names is not None else self.names
         return parse_id(self.ask(crop, self.prompt.format(hint=hint, menu=menu(names))),
                         ids(names))
@@ -101,8 +112,13 @@ class Florence(Hf):
 
     kind = "causallm"
 
-    def __init__(self, model="microsoft/Florence-2-base-ft", names=None,
-                 task="<CAPTION_TO_PHRASE_GROUNDING>", **kw):
+    def __init__(
+        self,
+        model: str = "microsoft/Florence-2-base-ft",
+        names: "dict[int, str] | list[str] | None" = None,
+        task: str = "<CAPTION_TO_PHRASE_GROUNDING>",
+        **kw: Any,
+    ):
         kw.setdefault("gen", {"max_new_tokens": 1024, "num_beams": 3, "do_sample": False})
         super().__init__(model, **kw)
         self.names = names
@@ -127,6 +143,7 @@ class Florence(Hf):
         return self.processor.post_process_generation(raw, task=task, image_size=pil.size)
 
     def find(self, img, names=None):
+        """Ground the class names in a BGR frame. Every box comes back at confidence 1.0."""
         lookup = self._lookup(names)
         task = self.task
         text = ", ".join(lookup) if task == "<CAPTION_TO_PHRASE_GROUNDING>" and lookup else ""

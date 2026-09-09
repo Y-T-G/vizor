@@ -1,8 +1,13 @@
 """The pipeline: a primary detector every frame, a secondary model when needed."""
 
+from typing import TYPE_CHECKING, Any
+
 from .boxes import Tracks
 from .refine import Refiner
 from .utils.video import Video, Writer
+
+if TYPE_CHECKING:
+    from .models.base import Model
 
 __all__ = ["Vizor"]
 
@@ -16,25 +21,35 @@ class Vizor:
     per frame.
 
     Args:
-        primary: model with a ``track(img)`` method returning :class:`~vizor.boxes.Tracks`.
+        primary: model with a ``track(img)`` method returning [Tracks][vizor.boxes.Tracks].
         secondary: model with ``find`` (full mode) or ``name`` (crop mode). Optional.
         conf: tracks at or below this confidence go to the secondary.
         mode: ``"full"`` runs the secondary on the whole frame, ``"crop"`` on each box.
         names: class id to name mapping. Defaults to whatever the primary reports.
 
-    Remaining keyword arguments go to :class:`~vizor.refine.Refiner`.
+    Remaining keyword arguments go to [Refiner][vizor.refine.Refiner].
     """
 
-    def __init__(self, primary, secondary=None, conf=0.5, mode="full", names=None, **kw):
+    def __init__(
+        self,
+        primary: "Model",
+        secondary: "Model | None" = None,
+        conf: float = 0.5,
+        mode: str = "full",
+        names: "dict[int, str] | list[str] | None" = None,
+        **kw: Any,
+    ):
         self.primary = primary
         self.refiner = Refiner(secondary, conf=conf, mode=mode, names=names, **kw)
 
     @property
     def secondary(self):
+        """The refining model, or None if there is not one."""
         return self.refiner.model
 
     @property
     def names(self):
+        """Class id to name mapping, falling back to whatever the primary reports."""
         return self.refiner.names or getattr(self.primary, "names", None)
 
     def reset(self):
@@ -45,7 +60,7 @@ class Vizor:
             reset()
 
     def step(self, img, preds=None):
-        """Process one frame and return the refined :class:`~vizor.boxes.Tracks`."""
+        """Process one frame and return the refined [Tracks][vizor.boxes.Tracks]."""
         tracks = self.primary.track(img)
         if not isinstance(tracks, Tracks):
             tracks = Tracks(tracks)
@@ -56,7 +71,7 @@ class Vizor:
     def run(self, src, save=None, show=False, fourcc="mp4v"):
         """Yield refined tracks for every frame of ``src``.
 
-        ``src`` is anything :class:`~vizor.utils.video.Video` opens: a file path,
+        ``src`` is anything [Video][vizor.utils.video.Video] opens: a file path,
         a camera index, or a stream url. Pass ``save`` to also write an annotated
         video, and ``show`` to display it in a window.
 

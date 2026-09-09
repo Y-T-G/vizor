@@ -7,8 +7,9 @@ each: boxes and track ids come from the detector, class labels come from the VLM
 and every VLM answer is cached against the track id so the same object is never
 asked about twice.
 
-Everything below runs from this repo. The cached predictions in `nbs/` let you
-try the whole pipeline with no GPU and no API key.
+Full documentation is at [y-t-g.github.io/vizor](https://y-t-g.github.io/vizor/).
+Everything below runs from this repo, and `examples/` holds each snippet as a
+script you can run.
 
 ## Install
 
@@ -16,10 +17,10 @@ The core needs numpy and OpenCV only. The model wrappers are optional extras, so
 install the one you actually use:
 
 ```sh
-pip install -e .              # core
-pip install -e ".[yolo]"      # ultralytics primary
-pip install -e ".[hf]"        # local Florence-2 or another transformers VLM
-pip install -e ".[api,groq]"  # hosted VLMs over OpenAI or Groq
+pip install vizor              # core
+pip install "vizor[yolo]"      # ultralytics primary
+pip install "vizor[hf]"        # local Florence-2 or another transformers VLM
+pip install "vizor[api,groq]"  # hosted VLMs over OpenAI or Groq
 ```
 
 Model wrappers are imported on first use, so `import vizor` never pulls in torch
@@ -99,7 +100,7 @@ The repo ships YOLOv5n tracks and Florence-2 grounding output for `traffic3.mp4`
  conf   boxes  relabelled  ms/frame  low conf  vlm calls
  0.30   48756        2518      0.11      2331        336
  0.50   48756        2342      0.15      8457        569
- 0.90   48756        6443      0.24     47579        596
+ 0.90   48756        6443      0.22     47579        596
 ```
 
 `relabelled` and `ms/frame` come from full mode against the Florence output.

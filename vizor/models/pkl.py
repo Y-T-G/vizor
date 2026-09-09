@@ -6,6 +6,7 @@ again on every run.
 """
 
 import pickle
+from pathlib import Path
 
 import numpy as np
 
@@ -34,7 +35,12 @@ class Pkl(Model):
 
     ULTRALYTICS = ULTRALYTICS
 
-    def __init__(self, file, cols=None, names=None):
+    def __init__(
+        self,
+        file: "str | Path",
+        cols: "list[int] | None" = None,
+        names: "dict[int, str] | list[str] | None" = None,
+    ):
         with open(file, "rb") as f:
             self.frames = list(pickle.load(f))
         self.file = str(file)
@@ -46,6 +52,7 @@ class Pkl(Model):
         return len(self.frames)
 
     def reset(self):
+        """Rewind to the first frame."""
         self.i = 0
 
     def next(self):
@@ -61,9 +68,11 @@ class Pkl(Model):
         return data
 
     def track(self, img=None):
+        """The next saved frame as Tracks. ``img`` is ignored."""
         return Tracks(self.next(), names=self.names)
 
     def find(self, img=None, names=None):
+        """The next saved frame as Preds. ``img`` is ignored."""
         return Preds(self.next(), names=names or self.names)
 
     def __iter__(self):

@@ -20,11 +20,11 @@ class Model:
     names = None
 
     def track(self, img):
-        """Detect and track on a BGR frame. Returns :class:`~vizor.boxes.Tracks`."""
+        """Detect and track on a BGR frame. Returns [Tracks][vizor.boxes.Tracks]."""
         raise NotImplementedError(f"{type(self).__name__} cannot be a primary model")
 
     def find(self, img, names=None):
-        """Detect on a whole BGR frame. Returns :class:`~vizor.boxes.Preds`."""
+        """Detect on a whole BGR frame. Returns [Preds][vizor.boxes.Preds]."""
         raise NotImplementedError(f"{type(self).__name__} does not support mode='full'")
 
     def name(self, crop, names=None, hint=None):

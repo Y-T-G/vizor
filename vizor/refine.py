@@ -1,10 +1,15 @@
 """The refiner: a fast tracker corrected by a slow, accurate model."""
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from .boxes import Preds, Tracks, iou
 from .utils.image import crop, label
 from .vote import Vote
+
+if TYPE_CHECKING:
+    from .models.base import Model
 
 __all__ = ["Refiner"]
 
@@ -41,8 +46,18 @@ class Refiner:
         hist: how many votes to keep per track id.
     """
 
-    def __init__(self, model=None, conf=0.5, mode="full", iou=0.5, names=None,
-                 votes=1, best=True, size=256, hist=25):
+    def __init__(
+        self,
+        model: "Model | None" = None,
+        conf: float = 0.5,
+        mode: str = "full",
+        iou: float = 0.5,
+        names: "dict[int, str] | list[str] | None" = None,
+        votes: int = 1,
+        best: bool = True,
+        size: int = 256,
+        hist: int = 25,
+    ):
         if mode not in MODES:
             raise ValueError(f"mode must be one of {sorted(set(MODES))}, got {mode!r}")
         self.model = model

@@ -1,5 +1,7 @@
 """Ultralytics YOLO, usable as either half of the pipeline."""
 
+from typing import Any
+
 import numpy as np
 
 from ..boxes import Preds, Tracks
@@ -17,7 +19,12 @@ class Yolo(Model):
         kw: forwarded to every ultralytics call, e.g. ``imgsz``, ``device``, ``half``.
     """
 
-    def __init__(self, model="yolo11n.pt", tracker="bytetrack.yaml", **kw):
+    def __init__(
+        self,
+        model: str = "yolo11n.pt",
+        tracker: str = "bytetrack.yaml",
+        **kw: Any,
+    ):
         from ultralytics import YOLO
 
         self.model = YOLO(model) if isinstance(model, str) else model
@@ -38,12 +45,14 @@ class Yolo(Model):
         return np.column_stack([data[:, :6], np.full(len(data), -1, np.float32)])
 
     def track(self, img):
+        """Detect and track on a BGR frame, keeping tracker state between calls."""
         result = self.model.track(img, persist=True, tracker=self.tracker,
                                   verbose=False, **self.kw)[0]
         self.names = result.names
         return Tracks(self._data(result), names=result.names, img=img)
 
     def find(self, img, names=None):
+        """Detect on a BGR frame without tracking. Used as a full mode secondary."""
         result = self.model.predict(img, verbose=False, **self.kw)[0]
         self.names = result.names
         return Preds(self._data(result), names=names or result.names)

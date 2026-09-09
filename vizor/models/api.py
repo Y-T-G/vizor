@@ -1,6 +1,7 @@
 """Chat VLMs behind an OpenAI-style HTTP API."""
 
 import os
+from typing import Any
 
 import cv2
 
@@ -28,7 +29,15 @@ class Vlm(Model):
     Never pass a key as a literal in code you commit. Put it in the environment.
     """
 
-    def __init__(self, model, api="openai", key=None, url=None, prompt=None, **kw):
+    def __init__(
+        self,
+        model: str,
+        api: str = "openai",
+        key: "str | None" = None,
+        url: "str | None" = None,
+        prompt: "str | None" = None,
+        **kw: Any,
+    ):
         self.model = model
         self.api = api
         self.prompt = prompt or PROMPT
@@ -81,6 +90,7 @@ class Vlm(Model):
         return reply.choices[0].message.content
 
     def name(self, crop, names=None, hint=None):
+        """Ask the model which class the crop is. Returns a class id, or None if unsure."""
         names = names if names is not None else self.names
         text = self.prompt.format(hint=hint, menu=menu(names))
         return parse_id(self.ask(crop, text), ids(names))
