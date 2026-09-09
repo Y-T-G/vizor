@@ -7,11 +7,11 @@
 Set your key first, the model never takes one from the command line:
 
     pip install ultralytics
-    export GROQ_API_KEY=...
+    export GEMINI_API_KEY=...
     python examples/live.py traffic.mp4 --save out.mp4
 
-Use --api openai --model gpt-4o-mini for OpenAI, or --api gemini --model
-gemini-2.0-flash for Gemini, and set the matching key variable.
+Use --api openai --model gpt-4o-mini to go through OpenAI instead, with
+OPENAI_API_KEY set.
 """
 
 import argparse
@@ -25,8 +25,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("source", help="video file, camera index, or stream url")
     ap.add_argument("--weights", default="yolo11n.pt")
-    ap.add_argument("--api", default="groq", choices=["groq", "openai", "gemini"])
-    ap.add_argument("--model", default="llama-3.2-11b-vision-preview")
+    ap.add_argument("--api", default="gemini", choices=["gemini", "openai"])
+    ap.add_argument("--model", default="gemini-3.1-flash-lite")
     ap.add_argument("--conf", type=float, default=0.5, help="ask the VLM at or below this")
     ap.add_argument("--votes", type=int, default=1, help="VLM answers to collect per track")
     ap.add_argument("--chunk", type=int, default=8, help="crops per request, 1 to disable batching")

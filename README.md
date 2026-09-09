@@ -37,7 +37,6 @@ install the one you actually use:
 pip install vizor              # core
 pip install "vizor[hf]"        # local Florence-2 or another transformers VLM
 pip install "vizor[api]"       # hosted VLMs over OpenAI or Gemini
-pip install "vizor[groq]"      # and Groq, which ships its own client
 ```
 
 Model wrappers are imported on first use, so `import vizor` never pulls in torch
@@ -56,9 +55,14 @@ import vizor as vz
 from yolo import YOLO
 
 # YOLO detects and tracks every frame. The VLM only sees boxes YOLO scored at or
-# below conf, cropped out one at a time, and its answer is cached against the
-# track id, so each object costs one call no matter how long it stays in view.
-viz = vz.Vizor(YOLO("yolo11n.pt"), vz.VLM("gpt-4o-mini"), conf=0.5, mode="crop")
+# below conf, cut out and sent up to eight per request. Each answer is cached
+# against the track id, so an object costs one call however long it stays in view.
+viz = vz.Vizor(
+    YOLO("yolo11n.pt"),
+    vz.VLM("gemini-3.1-flash-lite", api="gemini"),
+    conf=0.5,
+    mode="crop",
+)
 
 # run() yields the refined boxes for each frame and writes the annotated video
 # as it goes. Drop save= and nothing is written.
@@ -67,7 +71,7 @@ for out in viz.run("traffic.mp4", save="out.mp4"):
 ```
 
 That writes an annotated `out.mp4` and yields the refined boxes for every frame.
-The key is read from `OPENAI_API_KEY`, never passed in code.
+The key is read from `GEMINI_API_KEY`, never passed in code.
 
 Florence-2 instead, running locally and grounding the whole frame in one pass:
 
@@ -168,7 +172,7 @@ Bundled models, all of them secondaries. The primary is yours to bring.
 
 | Model | What it is | Mode | Extra |
 | --- | --- | --- | --- |
-| `VLM` | any OpenAI-compatible chat endpoint, so OpenAI, Groq or Gemini | `crop` | `api` or `groq` |
+| `VLM` | any OpenAI-compatible chat endpoint, so OpenAI or Gemini | `crop` | `api` |
 | `HF` | a local transformers chat VLM | `crop` | `hf` |
 | `Florence` | Florence-2 as an open-vocabulary detector | `full` | `hf` |
 | `Pkl` | replays predictions you saved earlier | either | none |
@@ -227,4 +231,4 @@ across frames, and `HF` does not batch at all yet.
 - [Full documentation](https://y-t-g.github.io/vizor/), built from the docstrings
 - [Ultralytics](https://docs.ultralytics.com/) for the detector and trackers used in `examples/yolo.py`
 - [Florence-2](https://huggingface.co/microsoft/Florence-2-base-ft) for open-vocabulary grounding
-- [OpenAI](https://platform.openai.com/docs/guides/vision), [Groq](https://console.groq.com/docs) and [Gemini](https://ai.google.dev/gemini-api/docs/openai) for hosted vision models
+- [OpenAI](https://platform.openai.com/docs/guides/vision) and [Gemini](https://ai.google.dev/gemini-api/docs/openai) for hosted vision models

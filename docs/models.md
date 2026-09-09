@@ -9,7 +9,7 @@ crops at once.
 | --- | --- | --- | --- | --- | --- |
 | [`Florence`][vizor.models.hf.Florence] | `hf` | no | yes | yes | one call each |
 | [`HF`][vizor.models.hf.HF] | `hf` | no | no | yes | one call each |
-| [`VLM`][vizor.models.api.VLM] | `api`, `groq` or `gemini` | no | no | yes | one request per `chunk` |
+| [`VLM`][vizor.models.api.VLM] | `api` | no | no | yes | one request per `chunk` |
 | [`Pkl`][vizor.models.pkl.Pkl] | none | yes | yes | no | no |
 
 Anything you leave out raises on the first frame with a message naming the
@@ -29,23 +29,20 @@ single integer back.
 ```python
 import vizor as vz
 
-# reads the key from OPENAI_API_KEY
-openai = vz.VLM("gpt-4o-mini")
-
-# api="groq" picks the Groq endpoint and reads GROQ_API_KEY
-groq = vz.VLM("meta-llama/llama-4-scout-17b-16e-instruct", api="groq")
-
 # Gemini through its OpenAI compatibility layer. The base url is built in, so
 # this needs nothing but GEMINI_API_KEY.
-gemini = vz.VLM("gemini-2.0-flash", api="gemini")
+gemini = vz.VLM("gemini-3.1-flash-lite", api="gemini")
+
+# reads the key from OPENAI_API_KEY
+openai = vz.VLM("gpt-4o-mini")
 
 # url= points at any OpenAI-compatible server, such as vLLM or llama.cpp. Those
 # usually ignore the key, but the client still needs one, hence key="none".
 local = vz.VLM("qwen2.5-vl-7b", url="http://localhost:8000/v1", key="none")
 ```
 
-The key defaults to the provider's variable, one of `OPENAI_API_KEY`,
-`GROQ_API_KEY` or `GEMINI_API_KEY`, and constructing the model raises
+The key defaults to the provider's variable, `OPENAI_API_KEY` or
+`GEMINI_API_KEY`, and constructing the model raises
 `ValueError` when there is neither a key nor a url. Never pass a real key as a
 literal in code you commit. Put it in the environment.
 
@@ -56,7 +53,7 @@ literal in code you commit. Put it in the environment.
 
 ```python
 # up to 8 crops per request, which is the default
-viz = vz.Vizor(primary, vz.VLM("gemini-2.0-flash", api="gemini"), mode="crop")
+viz = vz.Vizor(primary, vz.VLM("gemini-3.1-flash-lite", api="gemini"), mode="crop")
 
 # one crop per request, the way it worked before batching existed
 viz = vz.Vizor(primary, vz.VLM("gpt-4o-mini", chunk=1), mode="crop")

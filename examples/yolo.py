@@ -15,7 +15,7 @@ is not exported from ``vizor``, so you import it from here.
     pip install vizor ultralytics
 
     from yolo import YOLO
-    viz = vz.Vizor(YOLO("yolo11n.pt"), vz.VLM("gpt-4o-mini"), mode="crop")
+    viz = vz.Vizor(YOLO("yolo11n.pt"), vz.VLM("gemini-3.1-flash-lite", api="gemini"), mode="crop")
 """
 
 import numpy as np

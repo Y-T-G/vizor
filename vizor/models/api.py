@@ -11,7 +11,6 @@ __all__ = ["VLM"]
 
 ENV = {
     "openai": "OPENAI_API_KEY",
-    "groq": "GROQ_API_KEY",
     "gemini": "GEMINI_API_KEY",
 }
 
@@ -26,10 +25,10 @@ class VLM(Model):
     ``mode="crop"``. The primary keeps the box, the VLM only fixes the class.
 
     Args:
-        model: model id, e.g. ``"gpt-4o-mini"`` or ``"gemini-2.0-flash"``.
-        api: ``"openai"``, ``"groq"``, ``"gemini"``, or ``"custom"`` with a ``url``.
-        key: API key. Read from the provider's env var if left out, one of
-            ``OPENAI_API_KEY``, ``GROQ_API_KEY`` or ``GEMINI_API_KEY``.
+        model: model id, e.g. ``"gemini-3.1-flash-lite"`` or ``"gpt-4o-mini"``.
+        api: ``"openai"``, ``"gemini"``, or ``"custom"`` with a ``url``.
+        key: API key. Read from ``OPENAI_API_KEY`` or ``GEMINI_API_KEY`` if
+            left out, depending on ``api``.
         url: base url, for self-hosted or third party OpenAI-compatible servers.
             Gemini has one built in, so ``api="gemini"`` needs no url.
         prompt: format string overriding the default. It is given ``hint`` and ``menu``.
@@ -70,10 +69,6 @@ class VLM(Model):
         opts = {"api_key": key}
         if url:
             opts["base_url"] = url
-        if api == "groq":
-            from groq import Groq
-
-            return Groq(**opts)
         if api in ("openai", "gemini", "custom"):
             from openai import OpenAI
 

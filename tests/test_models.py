@@ -190,7 +190,7 @@ def test_vlm_gemini_gets_the_google_url_and_env_var(monkeypatch):
         VLM, "_client",
         staticmethod(lambda api, key, url: (seen.update(api=api, key=key, url=url), fake)[1]),
     )
-    VLM("gemini-2.0-flash", api="gemini")
+    VLM("gemini-3.1-flash-lite", api="gemini")
     assert seen["url"] == URL["gemini"] == \
         "https://generativelanguage.googleapis.com/v1beta/openai/"
     assert seen["key"] == "from-env"
@@ -202,5 +202,5 @@ def test_vlm_without_a_key_says_which_variable_to_set(monkeypatch):
 
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     with pytest.raises(ValueError) as e:
-        VLM("gemini-2.0-flash", api="gemini")
+        VLM("gemini-3.1-flash-lite", api="gemini")
     assert "GEMINI_API_KEY" in str(e.value)

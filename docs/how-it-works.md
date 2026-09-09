@@ -37,7 +37,8 @@ every chat VLM.
 ```python
 # votes=1 means one call per track for its whole life. Raise it to keep asking
 # until that many answers are in, which costs more calls but survives a bad one.
-viz = vz.Vizor(primary, vz.VLM("gpt-4o-mini"), conf=0.5, mode="crop", votes=1)
+viz = vz.Vizor(primary, vz.VLM("gemini-3.1-flash-lite", api="gemini"),
+               conf=0.5, mode="crop", votes=1)
 ```
 
 `votes` is how many answers to collect per track before the secondary stops being

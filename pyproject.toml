@@ -32,7 +32,6 @@ dependencies = [
 [project.optional-dependencies]
 hf = ["torch>=2.0", "transformers>=4.40", "pillow>=9.0", "einops", "timm"]
 api = ["openai>=1.0"]
-groq = ["groq>=0.11"]
 dev = ["pytest>=7", "ruff>=0.5"]
 docs = ["zensical>=0.0.60", "mkdocstrings[python]>=0.25"]
 

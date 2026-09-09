@@ -36,9 +36,14 @@ import vizor as vz
 from yolo import YOLO
 
 # YOLO detects and tracks every frame. The VLM only sees boxes YOLO scored at or
-# below conf, cropped out one at a time, and its answer is cached against the
-# track id, so each object costs one call no matter how long it stays in view.
-viz = vz.Vizor(YOLO("yolo11n.pt"), vz.VLM("gpt-4o-mini"), conf=0.5, mode="crop")
+# below conf, cut out and sent up to eight per request. Each answer is cached
+# against the track id, so an object costs one call however long it stays in view.
+viz = vz.Vizor(
+    YOLO("yolo11n.pt"),
+    vz.VLM("gemini-3.1-flash-lite", api="gemini"),
+    conf=0.5,
+    mode="crop",
+)
 
 # run() yields the refined boxes for each frame and writes the annotated video
 # as it goes. Drop save= and nothing is written.
@@ -47,7 +52,7 @@ for out in viz.run("traffic.mp4", save="out.mp4"):
 ```
 
 That writes an annotated `out.mp4` and yields the refined boxes for every frame.
-The API key is read from `OPENAI_API_KEY`. Never pass it as a literal in code you
+The API key is read from `GEMINI_API_KEY`. Never pass it as a literal in code you
 commit.
 
 Florence-2 works instead, running locally and grounding the whole frame in one
