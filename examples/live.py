@@ -15,7 +15,7 @@ Use --api openai --model gpt-4o-mini to go through OpenAI instead.
 
 import argparse
 
-from yolo import Yolo
+from yolo import YOLO
 
 from vizor import Vizor, Vlm
 
@@ -34,7 +34,7 @@ def main():
 
     source = int(args.source) if args.source.isdigit() else args.source
     viz = Vizor(
-        Yolo(args.weights),
+        YOLO(args.weights),
         Vlm(args.model, api=args.api),
         conf=args.conf,
         mode="crop",

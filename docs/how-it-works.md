@@ -64,28 +64,3 @@ so an object that changes appearance can eventually change label.
 
 Ids below zero are ignored. Untracked boxes all carry `id = -1`, and pooling them
 into one cache entry would make every untracked object share a label.
-
-## Numbers
-
-The measurements below come from YOLOv5n tracks and Florence-2 grounding output
-for a 3600 frame traffic clip, replayed from disk with
-[`Pkl`][vizor.models.pkl.Pkl]. Reproduce them with `python examples/bench.py`.
-
-At `conf=0.5` there are 8457 boxes below the threshold across the video, and the
-vote cache turns them into 569 secondary calls.
-
-```
- conf   boxes  relabelled  ms/frame  low conf  vlm calls
- 0.30   48756        2518      0.11      2331        336
- 0.50   48756        2342      0.15      8457        569
- 0.90   48756        6443      0.22     47579        596
-```
-
-`relabelled` and `ms/frame` come from full mode against the Florence output.
-`low conf` and `vlm calls` come from crop mode with a stub secondary. The
-`ms/frame` column is the refiner's own cost, which is the IoU match and the vote
-lookup, and it moves by a few hundredths between runs. The secondary's inference
-cost is on top of that and is the only part that matters in practice.
-
-The table counts how many labels changed. It does not say how many of the changes
-were right, because there is no ground truth here. See [caveats](caveats.md).

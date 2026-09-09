@@ -32,14 +32,14 @@ Read [detectors and licensing](#detectors-and-licensing) before you use it.
 
 ## Quick start
 
-YOLO on every frame, a hosted VLM on the boxes YOLO is unsure of. `Yolo` here is
-the adapter from `examples/yolo.py`, not something you import from `vizor`:
+A detector on every frame, a hosted VLM on the boxes it is unsure of. `YOLO`
+comes from `examples/yolo.py`, not from `vizor`:
 
 ```python
 import vizor as vz
-from yolo import Yolo
+from yolo import YOLO
 
-viz = vz.Vizor(Yolo("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), conf=0.5, mode="crop")
+viz = vz.Vizor(YOLO("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), conf=0.5, mode="crop")
 
 for out in viz.run("traffic.mp4", save="out.mp4"):
     print(len(out), "boxes")
@@ -52,10 +52,10 @@ Florence-2 instead, running locally and grounding the whole frame in one pass:
 
 ```python
 import vizor as vz
-from yolo import Yolo
+from yolo import YOLO
 
 names = {0: "person", 2: "car", 7: "truck"}
-viz = vz.Vizor(Yolo("yolo11n.pt"), vz.Florence(names=names), conf=0.5, mode="full")
+viz = vz.Vizor(YOLO("yolo11n.pt"), vz.Florence(names=names), conf=0.5, mode="full")
 
 for out in viz.run(0, show=True):   # 0 is the first webcam
     pass
@@ -64,14 +64,14 @@ for out in viz.run(0, show=True):   # 0 is the first webcam
 Florence gives boxes as well as labels, so the refiner can correct the box too,
 not just the class.
 
-To try it with no models at all, replay the cached predictions:
+To try it with no models at all, replay predictions you saved earlier:
 
 ```sh
 python examples/replay.py --save out.mp4
 ```
 
-On this machine that prints `3600 frames in 9.6s (376 fps)` and leaves 139 tracks
-in the vote cache.
+That runs the refiner over the saved frames and writes an annotated video, so you
+can see what the refinement does without loading a model or spending a call.
 
 ## How it works
 
@@ -97,25 +97,6 @@ localises: Florence-2, a heavier YOLO, any open-vocabulary detector.
 secondary what it is. The box stays as the primary drew it and only the class
 changes. Use it when the secondary classifies but does not localise, which is
 every chat VLM.
-
-## Numbers
-
-The repo ships YOLOv5n tracks and Florence-2 grounding output for `traffic3.mp4`,
-3600 frames. Reproduce the table with `python examples/bench.py`:
-
-```
- conf   boxes  relabelled  ms/frame  low conf  vlm calls
- 0.30   48756        2518      0.11      2331        336
- 0.50   48756        2342      0.15      8457        569
- 0.90   48756        6443      0.22     47579        596
-```
-
-`relabelled` and `ms/frame` come from full mode against the Florence output.
-`low conf` and `vlm calls` come from crop mode with a stub secondary. At
-`conf=0.5` there are 8457 boxes below the threshold across the video, and the
-vote cache turns them into 569 calls. The `ms/frame` column is the refiner's own
-cost, which is the IoU match and the vote lookup. The secondary's inference cost
-is on top of that and is the only part that matters in practice.
 
 The refiner never adds or drops a box. It only rewrites the class, and in full
 mode the box and confidence too.
@@ -222,9 +203,6 @@ only the highest-IoU one, but the confidence problem stays.
 Nothing here is batched. Crop mode sends one request per low confidence track, one
 at a time. Batching the crops of a frame into a single request would cut the
 latency a lot, and is the obvious thing to add next.
-
-There is no evaluation against ground truth. The table above counts how many
-labels changed, not how many of the changes were right.
 
 ## Links
 

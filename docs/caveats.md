@@ -18,11 +18,6 @@ Nothing here is batched. Crop mode sends one request per low confidence track, o
 at a time. Batching a frame's crops into a single request would cut the latency a
 lot, and it is the obvious thing to add next.
 
-There is no evaluation against ground truth. The table in
-[how it works](how-it-works.md) counts how many labels changed, not how many of
-the changes were right. Someone running this against a labelled set would be the
-fastest way to find out whether the whole idea holds up, and I have not done it.
-
 The `conf` threshold is a single number applied to every class. A detector that is
 badly calibrated on one class and well calibrated on another needs either a
 per-class threshold or a lower global one that wastes calls elsewhere. Per-class

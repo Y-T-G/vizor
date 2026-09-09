@@ -9,25 +9,26 @@
 # https://github.com/ultralytics/ultralytics/blob/main/LICENSE
 """Ultralytics YOLO as a vizor model.
 
-Install ultralytics first, then use ``Yolo`` anywhere the docs say ``vz.Yolo``.
+Install ultralytics first, then pass ``YOLO`` to ``Vizor`` as the primary. It
+is not exported from ``vizor``, so you import it from here.
 
     pip install vizor ultralytics
 
-    from yolo import Yolo
-    viz = vz.Vizor(Yolo("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), mode="crop")
+    from yolo import YOLO
+    viz = vz.Vizor(YOLO("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), mode="crop")
 """
 
 import numpy as np
 
 from vizor import Model, Preds, Tracks
 
-__all__ = ["Yolo"]
+__all__ = ["YOLO"]
 
 # ultralytics tracked output is [x1, y1, x2, y2, id, conf, cls]
 ULTRALYTICS = [0, 1, 2, 3, 5, 6, 4]
 
 
-class Yolo(Model):
+class YOLO(Model):
     """A YOLO model. ``track`` makes it a primary, ``find`` a secondary.
 
     Args:
@@ -37,9 +38,9 @@ class Yolo(Model):
     """
 
     def __init__(self, model="yolo11n.pt", tracker="bytetrack.yaml", **kw):
-        from ultralytics import YOLO
+        import ultralytics
 
-        self.model = YOLO(model) if isinstance(model, str) else model
+        self.model = ultralytics.YOLO(model) if isinstance(model, str) else model
         self.tracker = tracker
         self.kw = kw
         self.names = getattr(self.model, "names", None)
