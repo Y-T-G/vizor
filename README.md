@@ -18,7 +18,6 @@ install the one you actually use:
 
 ```sh
 pip install vizor              # core
-pip install "vizor[yolo]"      # ultralytics primary
 pip install "vizor[hf]"        # local Florence-2 or another transformers VLM
 pip install "vizor[api,groq]"  # hosted VLMs over OpenAI or Groq
 ```
@@ -26,14 +25,21 @@ pip install "vizor[api,groq]"  # hosted VLMs over OpenAI or Groq
 Model wrappers are imported on first use, so `import vizor` never pulls in torch
 if you are not using a torch model.
 
+vizor ships no detector. It ships the base class and one working adapter you
+copy. `examples/yolo.py` is about 60 lines and wraps ultralytics, which is
+AGPL-3.0, so it lives outside the package and carries its own licence header.
+Read [detectors and licensing](#detectors-and-licensing) before you use it.
+
 ## Quick start
 
-YOLO on every frame, a hosted VLM on the boxes YOLO is unsure of:
+YOLO on every frame, a hosted VLM on the boxes YOLO is unsure of. `Yolo` here is
+the adapter from `examples/yolo.py`, not something you import from `vizor`:
 
 ```python
 import vizor as vz
+from yolo import Yolo
 
-viz = vz.Vizor(vz.Yolo("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), conf=0.5, mode="crop")
+viz = vz.Vizor(Yolo("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), conf=0.5, mode="crop")
 
 for out in viz.run("traffic.mp4", save="out.mp4"):
     print(len(out), "boxes")
@@ -46,9 +52,10 @@ Florence-2 instead, running locally and grounding the whole frame in one pass:
 
 ```python
 import vizor as vz
+from yolo import Yolo
 
 names = {0: "person", 2: "car", 7: "truck"}
-viz = vz.Vizor(vz.Yolo("yolo11n.pt"), vz.Florence(names=names), conf=0.5, mode="full")
+viz = vz.Vizor(Yolo("yolo11n.pt"), vz.Florence(names=names), conf=0.5, mode="full")
 
 for out in viz.run(0, show=True):   # 0 is the first webcam
     pass
@@ -149,9 +156,30 @@ Indexing with an int gives you one `Track`. Indexing with a mask or a slice give
 you a new `Tracks`, and because numpy copies on fancy indexing, writing to it does
 not touch the original.
 
-Bundled models: `Yolo` (primary or secondary), `Vlm` (OpenAI, Groq, or any
-OpenAI-compatible url), `Hf` (a local transformers chat VLM), `Florence`
-(Florence-2 as an open-vocabulary detector), `Pkl` (replay saved predictions).
+Bundled models: `Vlm` (OpenAI, Groq, or any OpenAI-compatible url), `Hf` (a local
+transformers chat VLM), `Florence` (Florence-2 as an open-vocabulary detector),
+`Pkl` (replay saved predictions). All of them are secondaries. The primary is
+yours to bring.
+
+## Detectors and licensing
+
+vizor is Apache-2.0. Ultralytics is AGPL-3.0, and AGPL says a work that combines
+with it must also be AGPL-3.0. A Python module that imports ultralytics forms
+that combined work when it runs, so shipping a YOLO wrapper inside an Apache-2.0
+wheel would put the two licences in conflict.
+
+So the wrapper is not in the package. It is `examples/yolo.py`, marked
+`AGPL-3.0-or-later`, and pip never installs it. Nothing that pip installs imports
+ultralytics.
+
+What that means for you. If your own project is AGPL-3.0, or you hold an
+Ultralytics Enterprise licence, copy `examples/yolo.py` and use it. If your
+project is closed source or permissively licensed, write an adapter for a
+detector whose licence you can live with. The interface is one method, and
+[writing your own model](#writing-your-own-model) below shows it.
+
+I am not a lawyer and this is not legal advice. If the answer matters
+commercially, ask one.
 
 ## Writing your own model
 
@@ -200,6 +228,6 @@ labels changed, not how many of the changes were right.
 
 ## Links
 
-- [Ultralytics](https://docs.ultralytics.com/) for the primary detector and trackers
+- [Ultralytics](https://docs.ultralytics.com/) for the detector and trackers used in `examples/yolo.py`, [AGPL-3.0](https://github.com/ultralytics/ultralytics/blob/main/LICENSE)
 - [Florence-2](https://huggingface.co/microsoft/Florence-2-base-ft) for open-vocabulary grounding
 - [Groq](https://console.groq.com/docs) and [OpenAI](https://platform.openai.com/docs/guides/vision) for hosted vision models

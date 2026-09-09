@@ -9,7 +9,8 @@ pip install vizor
 
 That gives you [`Vizor`][vizor.core.Vizor], [`Refiner`][vizor.refine.Refiner],
 [`Tracks`][vizor.boxes.Tracks], [`Vote`][vizor.vote.Vote] and the video helpers.
-It does not give you any model.
+It does not give you any model, and it never gives you a detector. See
+[licensing](models.md#licensing) for why the detector is yours to bring.
 
 ## Extras
 
@@ -17,16 +18,16 @@ Each extra pulls in the dependency for one group of model wrappers.
 
 | Extra | Installs | Gets you |
 | --- | --- | --- |
-| `yolo` | `ultralytics` | [`Yolo`][vizor.models.yolo.Yolo], primary or secondary |
 | `hf` | `torch`, `transformers`, `pillow`, `einops`, `timm` | [`Hf`][vizor.models.hf.Hf] and [`Florence`][vizor.models.hf.Florence] |
 | `api` | `openai` | [`Vlm`][vizor.models.api.Vlm] against OpenAI or any compatible url |
 | `groq` | `groq` | `Vlm(api="groq")` |
 | `dev` | `pytest`, `ruff` | the test suite and the linter |
+| `docs` | `zensical`, `mkdocstrings[python]` | building this site |
 
 Combine them with a comma.
 
 ```sh
-pip install "vizor[yolo,api]"
+pip install "vizor[api,hf]"
 ```
 
 [`Pkl`][vizor.models.pkl.Pkl] needs no extra. It replays predictions you saved
@@ -40,7 +41,7 @@ tests.
 ```sh
 git clone https://github.com/Y-T-G/vizor
 cd vizor
-pip install -e ".[yolo,dev]"
+pip install -e ".[dev]"
 pytest
 ```
 

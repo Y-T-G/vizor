@@ -1,13 +1,30 @@
-"""Ultralytics YOLO, usable as either half of the pipeline."""
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# This file is NOT part of the vizor package and is not installed by pip.
+# The rest of this repository is Apache-2.0. This file is AGPL-3.0-or-later
+# because it imports ultralytics, which is AGPL-3.0-or-later, and the two form
+# a combined work when you run them. Copy it into your own project only if that
+# project can be AGPL-3.0, or buy an Ultralytics Enterprise licence.
+#
+# https://github.com/ultralytics/ultralytics/blob/main/LICENSE
+"""Ultralytics YOLO as a vizor model.
 
-from typing import Any
+Install ultralytics first, then use ``Yolo`` anywhere the docs say ``vz.Yolo``.
+
+    pip install vizor ultralytics
+
+    from yolo import Yolo
+    viz = vz.Vizor(Yolo("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), mode="crop")
+"""
 
 import numpy as np
 
-from ..boxes import Preds, Tracks
-from .base import Model
+from vizor import Model, Preds, Tracks
 
 __all__ = ["Yolo"]
+
+# ultralytics tracked output is [x1, y1, x2, y2, id, conf, cls]
+ULTRALYTICS = [0, 1, 2, 3, 5, 6, 4]
 
 
 class Yolo(Model):
@@ -19,12 +36,7 @@ class Yolo(Model):
         kw: forwarded to every ultralytics call, e.g. ``imgsz``, ``device``, ``half``.
     """
 
-    def __init__(
-        self,
-        model: str = "yolo11n.pt",
-        tracker: str = "bytetrack.yaml",
-        **kw: Any,
-    ):
+    def __init__(self, model="yolo11n.pt", tracker="bytetrack.yaml", **kw):
         from ultralytics import YOLO
 
         self.model = YOLO(model) if isinstance(model, str) else model
@@ -40,8 +52,8 @@ class Yolo(Model):
         data = data.astype(np.float32)
         if not len(data):
             return np.zeros((0, 7), np.float32)
-        if data.shape[-1] == 7:  # [x1, y1, x2, y2, id, conf, cls]
-            return data[:, [0, 1, 2, 3, 5, 6, 4]]
+        if data.shape[-1] == 7:
+            return data[:, ULTRALYTICS]
         return np.column_stack([data[:, :6], np.full(len(data), -1, np.float32)])
 
     def track(self, img):

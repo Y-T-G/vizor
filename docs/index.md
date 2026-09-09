@@ -17,8 +17,8 @@ Install the core, then the extra for whichever model you plan to use.
 
 ```sh
 pip install vizor              # core: numpy and OpenCV
-pip install "vizor[yolo]"      # ultralytics primary
 pip install "vizor[api]"       # hosted VLMs over an OpenAI-compatible API
+pip install "vizor[hf]"        # local Florence-2 or another transformers VLM
 ```
 
 The full list of extras is on the [install page](install.md). Skipping the extra
@@ -28,12 +28,14 @@ wrappers are only imported when you construct one.
 ## Quick start
 
 This runs YOLO on every frame and sends the boxes YOLO is unsure of to a hosted
-VLM, one crop per box.
+VLM, one crop per box. `Yolo` is the adapter from `examples/yolo.py`, which is
+not part of the installed package. [Licensing](models.md#licensing) explains why.
 
 ```python
 import vizor as vz
+from yolo import Yolo
 
-viz = vz.Vizor(vz.Yolo("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), conf=0.5, mode="crop")
+viz = vz.Vizor(Yolo("yolo11n.pt"), vz.Vlm("gpt-4o-mini"), conf=0.5, mode="crop")
 
 for out in viz.run("traffic.mp4", save="out.mp4"):
     print(len(out), "boxes")
@@ -48,9 +50,10 @@ pass.
 
 ```python
 import vizor as vz
+from yolo import Yolo
 
 names = {0: "person", 2: "car", 7: "truck"}
-viz = vz.Vizor(vz.Yolo("yolo11n.pt"), vz.Florence(names=names), conf=0.5, mode="full")
+viz = vz.Vizor(Yolo("yolo11n.pt"), vz.Florence(names=names), conf=0.5, mode="full")
 
 for out in viz.run(0, show=True):   # 0 is the first webcam
     pass

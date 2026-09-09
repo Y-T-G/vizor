@@ -6,7 +6,6 @@ fill more than one.
 
 | Model | Extra | `track` | `find` | `name` |
 | --- | --- | --- | --- | --- |
-| [`Yolo`][vizor.models.yolo.Yolo] | `yolo` | yes | yes | yes |
 | [`Florence`][vizor.models.hf.Florence] | `hf` | no | yes | yes |
 | [`Hf`][vizor.models.hf.Hf] | `hf` | no | no | yes |
 | [`Vlm`][vizor.models.api.Vlm] | `api` or `groq` | no | no | yes |
@@ -15,19 +14,9 @@ fill more than one.
 Anything you leave out raises on the first frame with a message naming the
 missing role, rather than silently doing nothing.
 
-## Yolo
-
-Wraps an ultralytics model. As a primary it runs the tracker, as a secondary it
-detects.
-
-```python
-import vizor as vz
-
-viz = vz.Vizor(vz.Yolo("yolo11n.pt"), vz.Yolo("yolo11x.pt"), conf=0.5, mode="full")
-```
-
-A small model tracks every frame and a large one corrects it when the small one
-is unsure. Both models are ultralytics, so this needs only the `yolo` extra.
+Nothing in that table implements `track` except `Pkl`, which only replays. The
+package ships no live detector, and [licensing](#licensing) says why. Bring your
+own, or copy the ultralytics adapter in `examples/yolo.py`.
 
 ## Vlm
 
@@ -54,9 +43,10 @@ returned labels back to class ids, case insensitively.
 
 ```python
 import vizor as vz
+from yolo import Yolo
 
 names = {0: "person", 2: "car", 7: "truck"}
-viz = vz.Vizor(vz.Yolo("yolo11n.pt"), vz.Florence(names=names), mode="full")
+viz = vz.Vizor(Yolo("yolo11n.pt"), vz.Florence(names=names), mode="full")
 ```
 
 Florence needs the names up front because the prompt is the class list. Passing
@@ -77,7 +67,8 @@ viz = vz.Vizor(primary, secondary, conf=0.5, mode="full")
 
 `cols` reindexes each row into the `[x1, y1, x2, y2, conf, cls, id]` layout.
 `Pkl.ULTRALYTICS` is `[0, 1, 2, 3, 5, 6, 4]`, which is what ultralytics gives you
-for tracked boxes.
+for tracked boxes. It is a column order, not ultralytics code, so `Pkl` needs
+nothing installed.
 
 ## Writing your own
 
@@ -107,3 +98,32 @@ Two helpers in [`vizor.models.base`](reference/models.md) do the prompt work for
 you if you are wrapping a chat model. `menu(names)` renders the class list as
 `id: name` lines, and `parse_id(text, valid)` pulls the first integer out of a
 reply and returns `None` when it is negative or outside the menu.
+
+## Licensing
+
+vizor is Apache-2.0. Ultralytics is AGPL-3.0, and AGPL says a work that combines
+with it must also be AGPL-3.0. A Python module that imports ultralytics forms
+that combined work when it runs, so shipping a YOLO wrapper inside an Apache-2.0
+wheel would put the two licences in conflict.
+
+So the wrapper is not in the package. It is `examples/yolo.py`, marked
+`AGPL-3.0-or-later`, and pip never installs it. Nothing that pip installs imports
+ultralytics, and you can check that.
+
+```sh
+pip download vizor --no-deps -d /tmp/v && unzip -o -q /tmp/v/vizor-*.whl -d /tmp/v
+grep -rn "^[[:space:]]*\(import\|from\) ultralytics" /tmp/v/vizor/ ; echo "exit $?"
+```
+
+That prints `exit 1` and nothing else, meaning grep matched no line. The name
+still appears in `pkl.py`, in a comment and in the `Pkl.ULTRALYTICS` column
+order. That is a description of a data layout, not ultralytics code, and it
+imports nothing.
+
+What it means for you. If your own project is AGPL-3.0, or you hold an
+Ultralytics Enterprise licence, copy `examples/yolo.py` and use it. If your
+project is closed source or permissively licensed, write an adapter for a
+detector whose licence you can live with. The interface is `track`, above.
+
+I am not a lawyer and this is not legal advice. If the answer matters
+commercially, ask one.
