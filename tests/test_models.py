@@ -1,5 +1,4 @@
 import pickle
-import types
 
 import numpy as np
 import pytest
@@ -66,27 +65,9 @@ def test_pkl_reorders_ultralytics_columns(tmp_path):
     assert t.cls[0] == 2 and t.ids[0] == 5
 
 
-def test_yolo_column_order_without_ids():
-    from vizor.models.yolo import Yolo
-
-    six = np.array([[0, 0, 10, 10, 0.9, 2]], np.float32)
-    result = types.SimpleNamespace(boxes=types.SimpleNamespace(data=six))
-    out = Yolo._data(result)
-    assert out.shape == (1, 7) and out[0, 6] == -1
-
-
-def test_yolo_column_order_with_ids():
-    from vizor.models.yolo import Yolo
-
-    seven = np.array([[0, 0, 10, 10, 5, 0.9, 2]], np.float32)
-    result = types.SimpleNamespace(boxes=types.SimpleNamespace(data=seven))
-    out = Yolo._data(result)
-    assert out[0].tolist() == [0, 0, 10, 10, pytest.approx(0.9), 2, 5]
-
-
 def test_lazy_imports_do_not_need_torch():
     import vizor
 
-    assert "Yolo" in dir(vizor)
+    assert "Florence" in dir(vizor)
     with pytest.raises(AttributeError):
         _ = vizor.NoSuchModel

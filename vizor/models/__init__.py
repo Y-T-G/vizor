@@ -2,9 +2,9 @@
 
 from .base import Model
 
-__all__ = ["Model", "Yolo", "Vlm", "Hf", "Florence", "Pkl"]
+__all__ = ["Model", "Vlm", "Hf", "Florence", "Pkl"]
 
-_WHERE = {"Yolo": "yolo", "Vlm": "api", "Hf": "hf", "Florence": "hf", "Pkl": "pkl"}
+_WHERE = {"Vlm": "api", "Hf": "hf", "Florence": "hf", "Pkl": "pkl"}
 
 
 def __getattr__(name):

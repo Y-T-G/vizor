@@ -10,8 +10,6 @@ fills which role.
 
 ::: vizor.models.base.parse_id
 
-::: vizor.models.yolo.Yolo
-
 ::: vizor.models.api.Vlm
 
 ::: vizor.models.hf.Hf

@@ -1,7 +1,12 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Not part of the vizor package. AGPL because it uses the ultralytics adapter
+# in yolo.py next to this file. See the header there.
 """YOLO on every frame, a hosted VLM on the boxes YOLO is unsure of.
 
 Set your key first, the model never takes one from the command line:
 
+    pip install ultralytics
     export GROQ_API_KEY=...
     python examples/live.py traffic.mp4 --save out.mp4
 
@@ -10,7 +15,9 @@ Use --api openai --model gpt-4o-mini to go through OpenAI instead.
 
 import argparse
 
-from vizor import Vizor, Vlm, Yolo
+from yolo import Yolo
+
+from vizor import Vizor, Vlm
 
 
 def main():

@@ -19,8 +19,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install
@@ -28,8 +28,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[docs]"
       - name: Build
-        run: mkdocs build --strict
-      - uses: actions/upload-pages-artifact@v3
+        run: zensical build --clean --strict
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
@@ -42,4 +42,4 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
