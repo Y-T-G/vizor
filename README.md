@@ -14,18 +14,19 @@
 A small detector runs on every frame but gets classes wrong. A vision-language
 model gets them right but is too slow for every frame, and often returns no boxes
 at all. Vizor runs both. Boxes and track ids come from the detector, class labels
-come from the VLM, and each VLM answer is cached against the track id, so an
-object is only sent to the VLM once.
+come from the VLM, and each answer is cached against the track id. A track the
+detector is confident about never reaches the VLM. One it is unsure about goes
+once, not once per frame.
 
 Full documentation is at [y-t-g.github.io/vizor](https://y-t-g.github.io/vizor/).
 Everything below runs from this repo, and `examples/` holds each snippet as a
 script you can run.
 
-|  | Boxes every frame | Class labels come from | Cost per object |
+|  | Boxes every frame | Class labels come from | Slow model runs |
 | --- | --- | --- | --- |
-| Small detector alone | yes | the detector | one cheap call per frame |
-| VLM alone | no, or slow ones | the VLM | one slow call per frame |
-| vizor | yes | the VLM | one slow call per object |
+| Small detector alone | yes | the detector | never |
+| VLM alone | no, or slow ones | the VLM | every frame |
+| vizor | yes | the detector, and the VLM where it is unsure | once per doubtful track |
 
 ## Install
 
@@ -124,7 +125,7 @@ flowchart LR
     G -- "yes" --> A
     G -- "no" --> H
     H -- "yes, every later frame" --> A
-    H -- "no, once per object" --> S
+    H -- "no, once per track" --> S
     S -- "one vote per crop" --> C
     C -- "majority" --> A
     H -. "lookup" .-> C
@@ -149,8 +150,8 @@ Each frame goes through three steps.
    majority overwrites the class on this frame and on every later frame, whether
    or not the secondary runs again.
 
-Step 3 is what makes this affordable. A car that stays in view for 300 frames
-costs one VLM call, not 300.
+Step 3 is what makes this affordable. A car the detector is unsure of, in view
+for 300 frames, costs one VLM call, not 300. A car it is sure of costs none.
 
 There are two modes.
 
@@ -180,11 +181,17 @@ vz.Vizor(primary, secondary=None, conf=0.5, mode="full", names=None, **kw)
   being asked, crop mode only. Default 1.
 - `size` and `hist` cap the vote cache at that many track ids and that many votes
   each.
+- `workers` runs the secondary on that many background threads, so the frame loop
+  does not wait for it. The track keeps the primary's label until the answer
+  arrives, then the vote corrects it. Default 0, which blocks.
+- `chunk`, on `VLM`, is how many crops go in one request. Default 8.
 
 `viz.run(src, save=None, show=False)` yields refined `Tracks` for every frame of a
 file, a camera index, or a stream url. `viz.step(img)` does one frame.
 `viz.save(src, out)` runs the whole thing and writes the annotated video.
 `viz.reset()` clears the votes and the primary's tracker between videos.
+`viz.wait()` blocks until the background workers are done, `viz.close()` stops
+them, and `Vizor` is a context manager so a `with` block closes for you.
 
 `Tracks` wraps a float32 array of shape `(N, 7)` holding
 `[x1, y1, x2, y2, conf, cls, id]`, with `id = -1` for untracked boxes:

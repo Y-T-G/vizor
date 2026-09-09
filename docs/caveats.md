@@ -5,9 +5,12 @@ the tracker swaps ids between two nearby objects, the refined class follows the 
 and ends up on the wrong object. Raising `hist` makes a single bad frame matter
 less, but it does not fix an id swap.
 
-Untracked boxes all carry `id = -1`, so the cache skips them. They are refined on
-the frame they appear on and never remembered. If your primary does not track,
-every frame pays full price.
+Untracked boxes all carry `id = -1`. The cache cannot hold them without pooling
+every untracked object into one entry, so they are answered and written on the
+frame they appear on instead. That means they cost a call every frame they are
+visible, and if your primary does not track at all, every frame pays full price.
+Under `workers` they are skipped, because the frame is gone by the time the
+answer arrives.
 
 Florence-2 reports no confidence, so every box it returns comes back at 1.0. In
 full mode that overwrites the primary's confidence with a number that means

@@ -20,7 +20,7 @@ flowchart LR
     G -- "yes" --> A
     G -- "no" --> H
     H -- "yes, every later frame" --> A
-    H -- "no, once per object" --> S
+    H -- "no, once per track" --> S
     S -- "one vote per crop" --> C
     C -- "majority" --> A
     H -. "lookup" .-> C
@@ -44,8 +44,8 @@ Each frame goes through three steps.
    majority overwrites the class on this frame and on every later frame, whether
    or not the secondary runs again.
 
-Step 3 is what makes this affordable. A car that stays in view for 300 frames
-costs one VLM call, not 300.
+Step 3 is what makes this affordable. A car the detector is unsure of, in view
+for 300 frames, costs one VLM call, not 300. A car it is sure of costs none.
 
 The refiner never adds or drops a box. It only rewrites the class, and in full
 mode the box and confidence too.
@@ -83,6 +83,45 @@ whole life. Raise it to trade calls for a majority that survives one bad answer.
 
 The old names `"image"` and `"instance"` still work and mean `"full"` and
 `"crop"`.
+
+### Not waiting for the answer
+
+By default the frame loop stops while the secondary thinks. `workers` moves the
+request to background threads and lets the loop carry on with the primary's
+label. The answer is a vote against the track id, so when it arrives it corrects
+that track from the next frame on.
+
+```python
+# the loop keeps running at the primary's frame rate, two requests at a time
+viz = vz.Vizor(primary, secondary, conf=0.5, mode="crop", workers=2)
+```
+
+The cost is that the track wears the wrong label until the answer comes back.
+Reproduce this with `python examples/workers.py`, which stands a sleeping stub in
+for the secondary so the numbers do not depend on a network.
+
+```
+20 frames, a 400 ms secondary, a 30 fps primary
+
+ workers    fps  corrected from  requests  labels
+       0     19         frame 0         1  77777777777777777777
+       2     30        frame 13         1  00000000000007777777
+```
+
+The blocking run holds the right label from the start and drops to 19 fps. The
+background run keeps the full 30 fps and carries the primary's class 0 for 13
+frames before the vote corrects it to 7. Both send one request.
+
+A track is only asked about once at a time, so a slow answer does not pile up a
+request per frame while it is outstanding. Untracked boxes are skipped entirely
+under `workers`, because a late answer has nothing to attach to.
+
+`viz.wait()` blocks until everything in flight is back. `viz.close()` stops the
+threads and drops it. `Vizor` is a context manager, so a `with` block closes for
+you. Only use `workers` with a secondary that is safe to call from several
+threads, which a hosted API is and a single local GPU model is not.
+
+## Batching and the crop path
 
 In crop mode the refiner cuts out every doubtful box in the frame first, then
 hands the whole list to the secondary in one call to `batch`. A secondary that
