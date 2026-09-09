@@ -43,10 +43,10 @@ returned labels back to class ids, case insensitively.
 
 ```python
 import vizor as vz
-from yolo import Yolo
+from yolo import YOLO
 
 names = {0: "person", 2: "car", 7: "truck"}
-viz = vz.Vizor(Yolo("yolo11n.pt"), vz.Florence(names=names), mode="full")
+viz = vz.Vizor(YOLO("yolo11n.pt"), vz.Florence(names=names), mode="full")
 ```
 
 Florence needs the names up front because the prompt is the class list. Passing
