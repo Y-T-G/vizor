@@ -7,7 +7,7 @@ import numpy as np
 from ..boxes import Preds
 from .base import PROMPT, Model, ids, menu, parse_id
 
-__all__ = ["Hf", "Florence"]
+__all__ = ["HF", "Florence"]
 
 
 def _pil(img):
@@ -19,7 +19,7 @@ def _pil(img):
     return Image.fromarray(np.ascontiguousarray(img[..., ::-1]))
 
 
-class Hf(Model):
+class HF(Model):
     """A chat-style VLM loaded locally with transformers.
 
     Like the hosted models it classifies crops but does not localise, so use it
@@ -96,7 +96,7 @@ class Hf(Model):
                         ids(names))
 
 
-class Florence(Hf):
+class Florence(HF):
     """Microsoft Florence-2, used as an open-vocabulary detector.
 
     Florence grounds phrases to boxes, so it works in ``mode="full"``: it labels

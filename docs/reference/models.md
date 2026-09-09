@@ -10,9 +10,9 @@ fills which role.
 
 ::: vizor.models.base.parse_id
 
-::: vizor.models.api.Vlm
+::: vizor.models.api.VLM
 
-::: vizor.models.hf.Hf
+::: vizor.models.hf.HF
 
 ::: vizor.models.hf.Florence
 

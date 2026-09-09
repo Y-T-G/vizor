@@ -33,7 +33,7 @@ changes. Use it when the secondary classifies but does not localise, which is
 every chat VLM.
 
 ```python
-viz = vz.Vizor(primary, vz.Vlm("gpt-4o-mini"), conf=0.5, mode="crop", votes=1)
+viz = vz.Vizor(primary, vz.VLM("gpt-4o-mini"), conf=0.5, mode="crop", votes=1)
 ```
 
 `votes` is how many answers to collect per track before the secondary stops being

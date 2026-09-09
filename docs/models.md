@@ -7,8 +7,8 @@ fill more than one.
 | Model | Extra | `track` | `find` | `name` |
 | --- | --- | --- | --- | --- |
 | [`Florence`][vizor.models.hf.Florence] | `hf` | no | yes | yes |
-| [`Hf`][vizor.models.hf.Hf] | `hf` | no | no | yes |
-| [`Vlm`][vizor.models.api.Vlm] | `api` or `groq` | no | no | yes |
+| [`HF`][vizor.models.hf.HF] | `hf` | no | no | yes |
+| [`VLM`][vizor.models.api.VLM] | `api` or `groq` | no | no | yes |
 | [`Pkl`][vizor.models.pkl.Pkl] | none | yes | yes | no |
 
 Anything you leave out raises on the first frame with a message naming the
@@ -18,7 +18,7 @@ Nothing in that table implements `track` except `Pkl`, which only replays. The
 package ships no live detector, and [licensing](#licensing) says why. Bring your
 own, or copy the ultralytics adapter in `examples/yolo.py`.
 
-## Vlm
+## VLM
 
 Talks to any OpenAI-compatible chat completions endpoint. It sends the crop as a
 base64 JPEG data url along with a numbered menu of your class names, and reads a
@@ -27,8 +27,8 @@ single integer back.
 ```python
 import vizor as vz
 
-groq = vz.Vlm("meta-llama/llama-4-scout-17b-16e-instruct", api="groq")
-local = vz.Vlm("qwen2.5-vl-7b", url="http://localhost:8000/v1", key="none")
+groq = vz.VLM("meta-llama/llama-4-scout-17b-16e-instruct", api="groq")
+local = vz.VLM("qwen2.5-vl-7b", url="http://localhost:8000/v1", key="none")
 ```
 
 The key defaults to `OPENAI_API_KEY` or `GROQ_API_KEY` depending on `api`, and
