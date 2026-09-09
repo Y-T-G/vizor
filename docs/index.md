@@ -29,7 +29,7 @@ wrappers are only imported when you construct one.
 
 This runs a detector on every frame and sends the boxes it is unsure of to a
 hosted VLM, one crop per box. `YOLO` comes from `examples/yolo.py`, which is not
-part of the installed package. [Licensing](models.md#licensing) explains why.
+part of the installed package.
 
 ```python
 import vizor as vz
