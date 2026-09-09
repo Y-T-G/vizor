@@ -14,9 +14,13 @@ full mode that overwrites the primary's confidence with a number that means
 nothing. Set `best=False` if you would rather every matching box vote instead of
 only the highest-IoU one, but the confidence problem stays either way.
 
-Nothing here is batched. Crop mode sends one request per low confidence track, one
-at a time. Batching a frame's crops into a single request would cut the latency a
-lot, and it is the obvious thing to add next.
+Crop mode batches, but only as far as one frame goes. `VLM` puts up to `chunk`
+crops in a single request, and everything else falls back to one call per crop.
+On the traffic clip that turns 569 crops into 528 requests at `votes=1`, a saving
+of about 7 percent, because the vote cache has already removed most of the work.
+The batches only get big when a lot of new objects appear at once. Raising
+`votes` helps more, 2077 crops in 1632 requests at `votes=5`. Nothing batches
+across frames, and `HF` does not batch at all yet.
 
 The `conf` threshold is a single number applied to every class. A detector that is
 badly calibrated on one class and well calibrated on another needs either a

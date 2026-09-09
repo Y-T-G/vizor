@@ -18,8 +18,8 @@ Each extra pulls in the dependency for one group of model wrappers.
 | Extra | Installs | Gets you |
 | --- | --- | --- |
 | `hf` | `torch`, `transformers`, `pillow`, `einops`, `timm` | [`HF`][vizor.models.hf.HF] and [`Florence`][vizor.models.hf.Florence] |
-| `api` | `openai` | [`VLM`][vizor.models.api.VLM] against OpenAI or any compatible url |
-| `groq` | `groq` | `VLM(api="groq")` |
+| `api` | `openai` | [`VLM`][vizor.models.api.VLM] against OpenAI, Gemini, or any compatible url |
+| `groq` | `groq` | `VLM(api="groq")`, which uses Groq's own client |
 | `dev` | `pytest`, `ruff` | the test suite and the linter |
 | `docs` | `zensical`, `mkdocstrings[python]` | building this site |
 

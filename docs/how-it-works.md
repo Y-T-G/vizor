@@ -47,6 +47,12 @@ whole life. Raise it to trade calls for a majority that survives one bad answer.
 The old names `"image"` and `"instance"` still work and mean `"full"` and
 `"crop"`.
 
+In crop mode the refiner cuts out every doubtful box in the frame first, then
+hands the whole list to the secondary in one call to `batch`. A secondary that
+can answer about several crops at once, like [`VLM`][vizor.models.api.VLM], turns
+that into one request. One that cannot gets the default
+[`batch`][vizor.models.base.Model.batch], which calls `name` once per crop.
+
 ## The vote cache
 
 [`Vote`][vizor.vote.Vote] is an LRU keyed on track id. Each id holds a bounded

@@ -125,15 +125,25 @@ class Refiner:
     def _crop(self, tracks, img):
         if self.model is None or img is None:
             return
+        # collect the whole frame's doubtful crops first, so a model that can
+        # answer about several at once gets the chance to
+        picks, crops, hints = [], [], []
         for track in tracks:
             if track.conf > self.conf or self.cache.count(track.id) >= self.votes:
                 continue
             patch = crop(img, track.box)
             if patch.size == 0:
                 continue
-            cls = self.model.name(patch, self.names, hint=label(self.names, track.cls))
+            picks.append(track.id)
+            crops.append(patch)
+            hints.append(label(self.names, track.cls))
+        if not crops:
+            return
+        # Model.batch falls back to one name() call per crop, so a model that
+        # only implements name still works and behaves exactly as before
+        for id, cls in zip(picks, self.model.batch(crops, self.names, hints)):
             if cls is not None:
-                self.cache.add(track.id, cls)
+                self.cache.add(id, cls)
 
     def _apply(self, tracks):
         """Overwrite each class with the running majority vote for its track id."""

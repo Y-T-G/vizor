@@ -3,6 +3,7 @@ import pytest
 from conftest import boxes
 
 from vizor.boxes import Preds, Tracks
+from vizor.models.base import Model
 from vizor.refine import Refiner
 
 
@@ -115,3 +116,66 @@ def test_empty_tracks_are_fine(frame, fixed):
 def test_raw_array_input():
     out = Refiner(conf=0.5).run(np.array([[0, 0, 10, 10, 0.9, 1, 2]], np.float32))
     assert isinstance(out, Tracks) and out.cls[0] == 1
+
+
+def test_crop_asks_the_secondary_once_per_frame_not_once_per_box(frame, names):
+    """A model that can batch sees the whole frame's crops in one call."""
+
+    class Batching(Model):
+        def __init__(self):
+            self.calls = 0
+            self.sizes = []
+
+        def batch(self, crops, names=None, hints=None):
+            self.calls += 1
+            self.sizes.append(len(crops))
+            return [7] * len(crops)
+
+    model = Batching()
+    r = Refiner(model, conf=0.5, mode="crop", names=names)
+    tracks = Tracks(boxes(
+        [0, 0, 40, 40, 0.1, 0, 1],
+        [50, 50, 90, 90, 0.2, 0, 2],
+        [100, 100, 140, 140, 0.3, 0, 3],
+    ), names=names)
+    out = r.run(tracks, img=frame)
+
+    assert model.calls == 1 and model.sizes == [3]
+    assert out.cls.tolist() == [7, 7, 7]
+
+
+def test_crop_passes_the_primary_guess_as_a_hint_for_each_crop(frame, names):
+    seen = {}
+
+    class Hints(Model):
+        def batch(self, crops, names=None, hints=None):
+            seen["hints"] = list(hints)
+            return [None] * len(crops)
+
+    r = Refiner(Hints(), conf=0.5, mode="crop", names=names)
+    r.run(Tracks(boxes(
+        [0, 0, 40, 40, 0.1, 2, 1],
+        [50, 50, 90, 90, 0.2, 7, 2],
+    ), names=names), img=frame)
+    assert seen["hints"] == ["car", "truck"]
+
+
+def test_crop_skips_the_secondary_when_nothing_is_doubtful(frame, names):
+    class Never(Model):
+        def batch(self, crops, names=None, hints=None):
+            raise AssertionError("should not be called")
+
+    r = Refiner(Never(), conf=0.5, mode="crop", names=names)
+    r.run(Tracks(boxes([0, 0, 40, 40, 0.9, 2, 1]), names=names), img=frame)
+
+
+def test_crop_still_works_for_a_model_that_only_has_name(frame, names, fixed):
+    """The default Model.batch loops, so nothing that worked before breaks."""
+    model = fixed(cls=7)
+    r = Refiner(model, conf=0.5, mode="crop", names=names)
+    out = r.run(Tracks(boxes(
+        [0, 0, 40, 40, 0.1, 0, 1],
+        [50, 50, 90, 90, 0.2, 0, 2],
+    ), names=names), img=frame)
+    assert model.calls == 2  # one name() per crop
+    assert out.cls.tolist() == [7, 7]

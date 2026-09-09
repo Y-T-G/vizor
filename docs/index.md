@@ -17,7 +17,7 @@ Install the core, then the extra for whichever model you plan to use.
 
 ```sh
 pip install vizor              # core: numpy and OpenCV
-pip install "vizor[api]"       # hosted VLMs over an OpenAI-compatible API
+pip install "vizor[api]"       # hosted VLMs: OpenAI, Gemini, or any compatible url
 pip install "vizor[hf]"        # local Florence-2 or another transformers VLM
 ```
 

@@ -19,7 +19,8 @@ install the one you actually use:
 ```sh
 pip install vizor              # core
 pip install "vizor[hf]"        # local Florence-2 or another transformers VLM
-pip install "vizor[api,groq]"  # hosted VLMs over OpenAI or Groq
+pip install "vizor[api]"       # hosted VLMs over OpenAI or Gemini
+pip install "vizor[groq]"      # and Groq, which ships its own client
 ```
 
 Model wrappers are imported on first use, so `import vizor` never pulls in torch
@@ -192,9 +193,13 @@ full mode that overwrites the primary's confidence with a number that means
 nothing. Set `best=False` if you would rather every matching box vote instead of
 only the highest-IoU one, but the confidence problem stays.
 
-Nothing here is batched. Crop mode sends one request per low confidence track, one
-at a time. Batching the crops of a frame into a single request would cut the
-latency a lot, and is the obvious thing to add next.
+Crop mode batches, but only as far as one frame goes. `VLM` puts up to `chunk`
+crops in a single request, and everything else falls back to one call per crop.
+On the traffic clip that turns 569 crops into 528 requests at `votes=1`, a saving
+of about 7 percent, because the vote cache has already removed most of the work.
+The batches only get big when a lot of new objects appear at once. Raising
+`votes` helps more, 2077 crops in 1632 requests at `votes=5`. Nothing batches
+across frames, and `HF` does not batch at all yet.
 
 ## Links
 

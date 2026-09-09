@@ -2,17 +2,20 @@
 
 A model fills one of three roles. A primary implements `track`, a full mode
 secondary implements `find`, a crop mode secondary implements `name`. Some models
-fill more than one.
+fill more than one. `batch` is optional everywhere, and answers about several
+crops at once.
 
-| Model | Extra | `track` | `find` | `name` |
-| --- | --- | --- | --- | --- |
-| [`Florence`][vizor.models.hf.Florence] | `hf` | no | yes | yes |
-| [`HF`][vizor.models.hf.HF] | `hf` | no | no | yes |
-| [`VLM`][vizor.models.api.VLM] | `api` or `groq` | no | no | yes |
-| [`Pkl`][vizor.models.pkl.Pkl] | none | yes | yes | no |
+| Model | Extra | `track` | `find` | `name` | `batch` |
+| --- | --- | --- | --- | --- | --- |
+| [`Florence`][vizor.models.hf.Florence] | `hf` | no | yes | yes | one call each |
+| [`HF`][vizor.models.hf.HF] | `hf` | no | no | yes | one call each |
+| [`VLM`][vizor.models.api.VLM] | `api`, `groq` or `gemini` | no | no | yes | one request per `chunk` |
+| [`Pkl`][vizor.models.pkl.Pkl] | none | yes | yes | no | no |
 
 Anything you leave out raises on the first frame with a message naming the
-missing role, rather than silently doing nothing.
+missing role, rather than silently doing nothing. `batch` is the exception, since
+[`Model`][vizor.models.base.Model] gives it a default that calls `name` once per
+crop, so a model that never heard of batching still works.
 
 Nothing in that table implements `track` except `Pkl`, which only replays. Bring
 your own primary, or copy the ultralytics adapter in `examples/yolo.py`.
@@ -26,17 +29,46 @@ single integer back.
 ```python
 import vizor as vz
 
-# api="groq" picks the Groq endpoint and reads the key from GROQ_API_KEY
+# reads the key from OPENAI_API_KEY
+openai = vz.VLM("gpt-4o-mini")
+
+# api="groq" picks the Groq endpoint and reads GROQ_API_KEY
 groq = vz.VLM("meta-llama/llama-4-scout-17b-16e-instruct", api="groq")
+
+# Gemini through its OpenAI compatibility layer. The base url is built in, so
+# this needs nothing but GEMINI_API_KEY.
+gemini = vz.VLM("gemini-2.0-flash", api="gemini")
 
 # url= points at any OpenAI-compatible server, such as vLLM or llama.cpp. Those
 # usually ignore the key, but the client still needs one, hence key="none".
 local = vz.VLM("qwen2.5-vl-7b", url="http://localhost:8000/v1", key="none")
 ```
 
-The key defaults to `OPENAI_API_KEY` or `GROQ_API_KEY` depending on `api`, and
-constructing the model raises `ValueError` when neither is set. Never pass a real
-key as a literal in code you commit. Put it in the environment.
+The key defaults to the provider's variable, one of `OPENAI_API_KEY`,
+`GROQ_API_KEY` or `GEMINI_API_KEY`, and constructing the model raises
+`ValueError` when there is neither a key nor a url. Never pass a real key as a
+literal in code you commit. Put it in the environment.
+
+### Batching
+
+`VLM` puts several crops in one request. `chunk` is how many, and the default is
+8.
+
+```python
+# up to 8 crops per request, which is the default
+viz = vz.Vizor(primary, vz.VLM("gemini-2.0-flash", api="gemini"), mode="crop")
+
+# one crop per request, the way it worked before batching existed
+viz = vz.Vizor(primary, vz.VLM("gpt-4o-mini", chunk=1), mode="crop")
+```
+
+A batched request numbers each crop and asks for one class id per crop, in
+order. The reply is parsed into exactly `chunk` answers. If the model returns too
+few, the crops it missed get no vote. If it returns too many, the extras are
+dropped. Neither case shifts an answer onto the wrong crop.
+
+Set `chunk=1` if you would rather pay for the round trips than trust a model to
+keep eight crops in order.
 
 ## Florence
 

@@ -10,7 +10,8 @@ Set your key first, the model never takes one from the command line:
     export GROQ_API_KEY=...
     python examples/live.py traffic.mp4 --save out.mp4
 
-Use --api openai --model gpt-4o-mini to go through OpenAI instead.
+Use --api openai --model gpt-4o-mini for OpenAI, or --api gemini --model
+gemini-2.0-flash for Gemini, and set the matching key variable.
 """
 
 import argparse
@@ -24,10 +25,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("source", help="video file, camera index, or stream url")
     ap.add_argument("--weights", default="yolo11n.pt")
-    ap.add_argument("--api", default="groq", choices=["groq", "openai"])
+    ap.add_argument("--api", default="groq", choices=["groq", "openai", "gemini"])
     ap.add_argument("--model", default="llama-3.2-11b-vision-preview")
     ap.add_argument("--conf", type=float, default=0.5, help="ask the VLM at or below this")
     ap.add_argument("--votes", type=int, default=1, help="VLM answers to collect per track")
+    ap.add_argument("--chunk", type=int, default=8, help="crops per request, 1 to disable batching")
     ap.add_argument("--save", default=None)
     ap.add_argument("--show", action="store_true")
     args = ap.parse_args()
@@ -36,7 +38,8 @@ def main():
     source = int(args.source) if args.source.isdigit() else args.source
     viz = Vizor(
         YOLO(args.weights),           # runs on every frame
-        VLM(args.model, api=args.api),  # runs only on boxes at or below --conf
+        # runs only on boxes at or below --conf, up to --chunk of them per request
+        VLM(args.model, api=args.api, chunk=args.chunk),
         conf=args.conf,
         mode="crop",                  # send the cropped box, not the whole frame
         votes=args.votes,             # stop asking about a track after this many answers
