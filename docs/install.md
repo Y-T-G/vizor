@@ -9,8 +9,7 @@ pip install vizor
 
 That gives you [`Vizor`][vizor.core.Vizor], [`Refiner`][vizor.refine.Refiner],
 [`Tracks`][vizor.boxes.Tracks], [`Vote`][vizor.vote.Vote] and the video helpers.
-It does not give you any model, and it never gives you a detector. See
-[licensing](models.md#licensing) for why the detector is yours to bring.
+It does not give you any model, and it does not give you a detector.
 
 ## Extras
 
