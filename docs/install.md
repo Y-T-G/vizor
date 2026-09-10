@@ -1,7 +1,8 @@
 # Install
 
 The core needs numpy and OpenCV only. Everything else is an optional extra, so
-you install the one your models actually need.
+you install the one your models actually need. Releases are on PyPI at
+[pypi.org/project/vizor](https://pypi.org/project/vizor/).
 
 ```sh
 pip install vizor
@@ -47,12 +48,12 @@ The suite needs no GPU, no API key and no model weights. It stubs the secondary
 instead of calling one.
 
 ```
-59 passed in 3.65s
+107 passed in 3.82s
 ```
 
-The replay tests in `tests/test_replay.py` skip themselves when the cached
+The four replay tests in `tests/test_replay.py` skip themselves when the cached
 predictions are not on disk, and those files are not in the repo, so a fresh
-clone reports fewer than 59.
+clone reports 103 passed and 4 skipped.
 
 ## Lazy imports
 
