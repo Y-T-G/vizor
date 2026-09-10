@@ -19,8 +19,8 @@ detector is confident about never reaches the VLM. One it is unsure about goes
 once, not once per frame.
 
 Full documentation is at [y-t-g.github.io/vizor](https://y-t-g.github.io/vizor/).
-Everything below runs from this repo, and `examples/` holds each snippet as a
-script you can run.
+Everything below runs from this repo, and [`examples/`](examples/) holds each
+snippet as a script you can run.
 
 |  | Boxes every frame | Class labels come from | Slow model runs |
 | --- | --- | --- | --- |
@@ -244,11 +244,3 @@ class MyDetector(Model):
 Images handed to your model are BGR, the layout OpenCV gives you. Convert inside
 your wrapper if the model wants RGB. `name` returns a class id, or `None` if the
 model is not sure, and `None` records no vote.
-
-## Links
-
-- [Full documentation](https://y-t-g.github.io/vizor/), built from the docstrings
-- [Caveats](https://y-t-g.github.io/vizor/caveats/), what this does badly and where it breaks
-- [Ultralytics](https://docs.ultralytics.com/) for the detector and trackers used in `examples/yolo.py`
-- [Florence-2](https://huggingface.co/microsoft/Florence-2-base-ft) for open-vocabulary grounding
-- [OpenAI](https://platform.openai.com/docs/guides/vision) and [Gemini](https://ai.google.dev/gemini-api/docs/openai) for hosted vision models
