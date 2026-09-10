@@ -1,6 +1,6 @@
 # Utilities
 
-Video reading and writing, and the two image helpers the drawing and crop mode
+Video reading and writing, and the image helpers the drawing, crop and collage
 paths use.
 
 ::: vizor.utils.video.Video
@@ -10,3 +10,7 @@ paths use.
 ::: vizor.utils.image.crop
 
 ::: vizor.utils.image.label
+
+::: vizor.utils.image.fit
+
+::: vizor.utils.image.montage

@@ -2,7 +2,7 @@
 
 from ..boxes import Preds, Tracks  # noqa: F401  (re-exported for implementers)
 
-__all__ = ["Model", "PROMPT", "BATCH", "menu", "ids", "parse_id", "parse_ids"]
+__all__ = ["Model", "PROMPT", "BATCH", "GRID", "menu", "ids", "parse_id", "parse_ids"]
 
 
 class Model:
@@ -46,6 +46,16 @@ class Model:
         hints = list(hints) if hints is not None else [None] * len(crops)
         return [self.name(c, names, h) for c, h in zip(crops, hints)]
 
+    def grid(self, collages, names=None, hints=None, tiles=1):
+        """Classify collages, each one object shown ``tiles`` times over a video.
+
+        Returns one class id or None per collage, the same shape as ``batch``.
+        The default forwards to ``batch``, which treats a collage as an ordinary
+        image, so a model that has never heard of collages still answers.
+        Override it to word the prompt for a grid.
+        """
+        return self.batch(collages, names, hints)
+
     def reset(self):
         """Drop any per-video state. Called by ``Vizor.reset``."""
 
@@ -70,6 +80,18 @@ BATCH = (
     "Reply with exactly {n} class ids, one per crop, in the same order, "
     "separated by commas. Use -1 for a crop where none of them fit. "
     "No words, no explanation, only the numbers and commas."
+)
+
+
+GRID = (
+    "This is a grid of {n} crops of the same object, cut from a detector's box "
+    "at different moments in a video and laid out left to right, top to bottom.\n"
+    "The detector called it {hint!r}, which may be wrong.\n"
+    "Some crops may be blurred, partly hidden or badly lit. Weigh them together "
+    "and answer once for the object, not once per crop.\n"
+    "Which of these classes is it?\n{menu}\n"
+    "Reply with the class id only: a single integer, no words, no punctuation. "
+    "Reply -1 if none of them fit."
 )
 
 

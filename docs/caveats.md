@@ -10,7 +10,14 @@ every untracked object into one entry, so they are answered and written on the
 frame they appear on instead. That means they cost a call every frame they are
 visible, and if your primary does not track at all, every frame pays full price.
 Under `workers` they are skipped, because the frame is gone by the time the
-answer arrives.
+answer arrives. Collage mode skips them too, since gathering crops over time
+needs an id to gather them against.
+
+Collage mode answers late by design. A track carries the primary's label until
+its collage is full, which is `(samples - 1) * every` frames after it first
+appears, and a track that leaves before then is never answered at all. Short
+tracks and busy scenes are where that bites. Lower `every` to answer sooner, at
+the cost of crops that look more alike.
 
 Florence-2 reports no confidence, so every box it returns comes back at 1.0. In
 full mode that overwrites the primary's confidence with a number that means

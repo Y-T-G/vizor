@@ -5,7 +5,7 @@ from typing import Any
 
 import cv2
 
-from .base import BATCH, PROMPT, Model, ids, menu, parse_id, parse_ids
+from .base import BATCH, GRID, PROMPT, Model, ids, menu, parse_id, parse_ids
 
 __all__ = ["VLM"]
 
@@ -35,6 +35,8 @@ class VLM(Model):
         chunk: how many crops go in one request. 1 sends them one at a time.
         batch: format string overriding the batched prompt. It is given ``n``,
             ``hints`` and ``menu``.
+        grid: format string overriding the collage prompt, used by ``mode="collage"``.
+            It is given ``n`` (tiles in the collage), ``hint`` and ``menu``.
         kw: forwarded to the chat completion call, e.g. ``temperature``, ``max_tokens``.
 
     Never pass a key as a literal in code you commit. Put it in the environment.
@@ -49,12 +51,14 @@ class VLM(Model):
         prompt: "str | None" = None,
         chunk: int = 8,
         batch: "str | None" = None,
+        grid: "str | None" = None,
         **kw: Any,
     ):
         self.model = model
         self.api = api
         self.prompt = prompt or PROMPT
         self.batch_prompt = batch or BATCH
+        self.grid_prompt = grid or GRID
         self.chunk = max(1, int(chunk))
         self.kw = {"temperature": 0, "max_tokens": 16, **kw}
         key = key or os.environ.get(ENV.get(api, ""))
@@ -137,4 +141,21 @@ class VLM(Model):
             # 16 tokens holds one id, not eight, so give the reply room to fit
             room = max(self.kw.get("max_tokens", 16), 8 * len(part))
             out += parse_ids(self.ask(part, text, max_tokens=room), len(part), valid)
+        return out
+
+    def grid(self, collages, names=None, hints=None, tiles=1):
+        """Ask about one collage per request. Returns a class id or None per collage.
+
+        ``chunk`` does not apply here. Several grids in one request would ask the
+        model to keep the tiles and the grids straight at the same time, and
+        collage mode already fires once per track rather than once per frame, so
+        the round trips are not where the cost is.
+        """
+        names = names if names is not None else self.names
+        hints = list(hints) if hints is not None else [None] * len(collages)
+        valid, lines = ids(names), menu(names)
+        out = []
+        for sheet, hint in zip(collages, hints):
+            text = self.grid_prompt.format(n=tiles, hint=hint, menu=lines)
+            out.append(parse_id(self.ask(sheet, text), valid))
         return out
