@@ -22,9 +22,11 @@ class Vizor:
 
     Args:
         primary: model with a ``track(img)`` method returning [Tracks][vizor.boxes.Tracks].
-        secondary: model with ``find`` (full mode) or ``name`` (crop mode). Optional.
+        secondary: model with ``find`` (full mode), ``name`` (crop mode) or
+            ``grid`` (collage mode). Optional.
         conf: tracks at or below this confidence go to the secondary.
-        mode: ``"full"`` runs the secondary on the whole frame, ``"crop"`` on each box.
+        mode: ``"full"`` runs the secondary on the whole frame, ``"crop"`` on each
+            box, ``"collage"`` on several crops of one track tiled together.
         names: class id to name mapping. Defaults to whatever the primary reports.
 
     Remaining keyword arguments go to [Refiner][vizor.refine.Refiner]. Pass

@@ -7,18 +7,19 @@
         print(out)
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 from .boxes import Preds, Track, Tracks, iou
 from .core import Vizor
 from .refine import Refiner
+from .utils.image import montage
 from .utils.video import Video, Writer
 from .vote import Vote
 
 __all__ = [
     "Vizor", "Refiner", "Vote",
     "Track", "Tracks", "Preds", "iou",
-    "Video", "Writer",
+    "Video", "Writer", "montage",
     "Model", "VLM", "HF", "Florence", "Pkl",
     "__version__",
 ]

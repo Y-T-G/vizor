@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 
 from ..boxes import Preds
-from .base import PROMPT, Model, ids, menu, parse_id
+from .base import GRID, PROMPT, Model, ids, menu, parse_id
 
 __all__ = ["HF", "Florence"]
 
@@ -30,6 +30,8 @@ class HF(Model):
         device: ``"cuda"``, ``"cpu"``, or None to pick whatever is available.
         dtype: torch dtype, defaults to bfloat16 on GPU and float32 on CPU.
         prompt: format string overriding the default. Given ``hint`` and ``menu``.
+        grid: format string overriding the collage prompt, used by ``mode="collage"``.
+            Given ``n`` (tiles in the collage), ``hint`` and ``menu``.
         gen: generation keyword arguments, e.g. ``max_new_tokens``.
     """
 
@@ -41,6 +43,7 @@ class HF(Model):
         device: "str | None" = None,
         dtype: "str | None" = None,
         prompt: "str | None" = None,
+        grid: "str | None" = None,
         gen: "dict[str, Any] | None" = None,
         **kw: Any,
     ):
@@ -50,6 +53,7 @@ class HF(Model):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.dtype = dtype or (torch.bfloat16 if self.device == "cuda" else torch.float32)
         self.prompt = prompt or PROMPT
+        self.grid_prompt = grid or GRID
         self.gen = {"max_new_tokens": 16, "do_sample": False, **(gen or {})}
         self.processor = AutoProcessor.from_pretrained(model, trust_remote_code=True)
         self.model = self._load(model, **kw)
@@ -94,6 +98,14 @@ class HF(Model):
         names = names if names is not None else self.names
         return parse_id(self.ask(crop, self.prompt.format(hint=hint, menu=menu(names))),
                         ids(names))
+
+    def grid(self, collages, names=None, hints=None, tiles=1):
+        """Ask about each collage in its own forward pass, with the grid prompt."""
+        names = names if names is not None else self.names
+        hints = list(hints) if hints is not None else [None] * len(collages)
+        valid, lines = ids(names), menu(names)
+        return [parse_id(self.ask(s, self.grid_prompt.format(n=tiles, hint=h, menu=lines)), valid)
+                for s, h in zip(collages, hints)]
 
 
 class Florence(HF):
@@ -164,3 +176,7 @@ class Florence(HF):
             return None
         areas = (preds.boxes[:, 2] - preds.boxes[:, 0]) * (preds.boxes[:, 3] - preds.boxes[:, 1])
         return int(preds.cls[int(areas.argmax())])
+
+    def grid(self, collages, names=None, hints=None, tiles=1):
+        """Largest thing Florence grounds in each collage. It has no chat prompt to word."""
+        return [self.name(sheet, names) for sheet in collages]

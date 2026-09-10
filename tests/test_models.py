@@ -204,3 +204,46 @@ def test_vlm_without_a_key_says_which_variable_to_set(monkeypatch):
     with pytest.raises(ValueError) as e:
         VLM("gemini-3.1-flash-lite", api="gemini")
     assert "GEMINI_API_KEY" in str(e.value)
+
+
+def test_base_grid_falls_back_to_batch():
+    class Loop(Model):
+        def __init__(self):
+            self.seen = []
+
+        def name(self, crop, names=None, hint=None):
+            self.seen.append(hint)
+            return 1
+
+    m = Loop()
+    assert m.grid(["sheet a", "sheet b"], hints=["person", "person"], tiles=4) == [1, 1]
+    assert m.seen == ["person", "person"]
+
+
+def test_vlm_grid_sends_one_request_per_collage(monkeypatch):
+    m, fake = make_vlm(monkeypatch, "1")
+    assert m.grid(crops(3), {0: "man", 1: "woman"}, ["person"] * 3, tiles=4) == [1, 1, 1]
+    assert len(fake.calls) == 3  # chunk does not apply, a grid of grids is not sent
+    content = fake.calls[0]["messages"][0]["content"]
+    assert sum(c["type"] == "image_url" for c in content) == 1
+
+
+def test_vlm_grid_says_how_many_crops_are_in_the_sheet(monkeypatch):
+    m, fake = make_vlm(monkeypatch, "0")
+    m.grid(crops(1), {0: "man", 1: "woman"}, ["person"], tiles=6)
+    text = fake.calls[0]["messages"][0]["content"][-1]["text"]
+    assert "grid of 6 crops" in text
+    assert "'person'" in text
+    assert "0: man\n1: woman" in text
+
+
+def test_vlm_grid_prompt_can_be_replaced(monkeypatch):
+    m, fake = make_vlm(monkeypatch, "1", grid="{n} shots of a {hint}. {menu}")
+    m.grid(crops(1), {1: "woman"}, ["person"], tiles=2)
+    text = fake.calls[0]["messages"][0]["content"][-1]["text"]
+    assert text == "2 shots of a person. 1: woman"
+
+
+def test_vlm_grid_rejects_an_id_outside_the_menu(monkeypatch):
+    m, _ = make_vlm(monkeypatch, "9")
+    assert m.grid(crops(1), {0: "man", 1: "woman"}) == [None]

@@ -8,7 +8,9 @@ directory, because two of them look for data under `nbs/`.
 | [`workers.py`](workers.py) | measures blocking against background refinement | nothing |
 | [`replay.py`](replay.py) | refines saved predictions and writes an annotated video | saved predictions |
 | [`bench.py`](bench.py) | counts labels changed and secondary calls saved | saved predictions |
+| [`bigger.py`](bigger.py) | a small YOLO corrected by a big one, and what that costs | ultralytics |
 | [`live.py`](live.py) | YOLO on a video or webcam, a hosted VLM on the doubtful boxes | ultralytics, an API key |
+| [`collage.py`](collage.py) | asks a VLM one question per person, from crops over time | ultralytics, an API key |
 | [`yolo.py`](yolo.py) | the ultralytics adapter the other scripts import | ultralytics |
 
 ## The one that needs nothing
@@ -62,7 +64,31 @@ tracks ended up in the vote cache.
 `bench.py` prints how many labels changed at each `conf`, and how many secondary
 calls the vote cache saved.
 
-## The one that costs money
+## The one that needs no key
+
+`bigger.py` uses a heavier YOLO as the secondary instead of a VLM, so it needs
+ultralytics and a video and nothing else. It runs both models over the clip and
+reports what the big one changed.
+
+```sh
+pip install vizor ultralytics
+python examples/bigger.py traffic.mp4 --frames 300
+```
+
+This is what it printed on 300 frames of a 1280x720 traffic clip, on a laptop
+CPU with no GPU. Your frame rate will differ, the shape of the answer will not.
+
+```
+300 frames, 2433 boxes, 4.5 fps
+428 labels changed by yolo11m.pt
+77 calls to the big model, 47 tracks in the vote cache
+```
+
+`--conf 0` never asks the big model, which gives you the small one's own numbers
+to compare against. `--mode full` runs it on the whole frame instead of the
+crops, which also corrects the boxes.
+
+## The two that cost money
 
 `live.py` runs a real detector on a real video and sends the doubtful crops to a
 hosted VLM. Install ultralytics and set a key first, or it will not start.
@@ -77,8 +103,21 @@ Add `--workers 2` to stop the frame loop waiting on the VLM, and `--show` for a
 window. `--api openai --model gpt-4o-mini` goes through OpenAI instead, with
 `OPENAI_API_KEY` set.
 
+`collage.py` asks a different kind of question. It tracks people, gathers six
+crops of each one spread over 40 frames, tiles them into a single image and asks
+the VLM which of your classes that person is. The detector never knew the answer,
+so this is not correcting it, it is adding a label the detector could not give.
+
+```sh
+python examples/collage.py street.mp4 --classes man,woman --save out.mp4
+```
+
+`--classes` is the question. `--samples` and `--every` set how many crops go in a
+collage and how far apart they are taken, so together they decide how long a
+track waits before it is answered.
+
 ## Licensing
 
-`yolo.py` and `live.py` are `AGPL-3.0-or-later`, because they use ultralytics.
-The rest of this repository is Apache-2.0. Read the header in `yolo.py` before
-copying it into your own project.
+`yolo.py`, `bigger.py`, `live.py` and `collage.py` are `AGPL-3.0-or-later`,
+because they use ultralytics. The rest of this repository is Apache-2.0. Read the
+header in `yolo.py` before copying it into your own project.

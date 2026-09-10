@@ -309,3 +309,152 @@ def test_workers_zero_never_starts_a_pool(frame, names, fixed):
     r = Refiner(fixed(cls=7), conf=0.5, mode="crop", names=names)
     r.run(doubtful(names), img=frame)
     assert r.pool is None and not r.jobs
+
+
+# collage mode ------------------------------------------------------------
+class Sheets(Model):
+    """A collage secondary that records what it was handed."""
+
+    def __init__(self, cls=1):
+        self.cls = cls
+        self.calls = []
+
+    def grid(self, collages, names=None, hints=None, tiles=1):
+        self.calls.append({"n": len(collages), "shape": collages[0].shape,
+                           "tiles": tiles, "hints": list(hints)})
+        return [self.cls] * len(collages)
+
+
+def person(id=1, conf=0.9, cls=0, names=None):
+    return Tracks(boxes([10, 10, 50, 90, conf, cls, id]), names=names)
+
+
+MENU = {0: "man", 1: "woman"}
+
+
+def test_collage_waits_for_enough_samples(frame):
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=3, every=4)
+    seen = [int(r.run(person(), img=frame).cls[0]) for _ in range(12)]
+    # sampled on frames 0, 4 and 8, so the answer lands on 8 and holds after it
+    assert seen == [0] * 8 + [1] * 4
+    assert len(model.calls) == 1
+    assert model.calls[0]["tiles"] == 3
+
+
+def test_collage_asks_once_per_track(frame):
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=2, every=0)
+    for _ in range(30):
+        r.run(person(), img=frame)
+    assert len(model.calls) == 1  # votes=1, so one collage covers the track for life
+
+
+def test_collage_keeps_asking_when_votes_is_raised(frame):
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=2, every=0, votes=3)
+    for _ in range(30):
+        r.run(person(), img=frame)
+    assert len(model.calls) == 3
+
+
+def test_collage_spaces_its_samples(frame):
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=2, every=10)
+    for _ in range(10):
+        r.run(person(), img=frame)
+    assert model.calls == []  # only frames 0 and 10 count, and 10 has not come
+    r.run(person(), img=frame)
+    assert len(model.calls) == 1
+
+
+def test_collage_gathers_each_track_separately(frame):
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=2, every=0)
+    two = Tracks(boxes(
+        [10, 10, 50, 90, 0.9, 0, 1],
+        [60, 10, 100, 90, 0.9, 0, 2],
+    ))
+    r.run(two, img=frame)
+    out = r.run(two, img=frame)
+    assert model.calls[0]["n"] == 2       # both matured on the same frame
+    assert out.cls.tolist() == [1, 1]
+
+
+def test_collage_skips_untracked_boxes(frame):
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=2, every=0)
+    for _ in range(6):
+        out = r.run(person(id=-1), img=frame)
+    assert model.calls == []
+    assert out.cls.tolist() == [0]
+
+
+def test_collage_skips_confident_tracks(frame):
+    model = Sheets()
+    r = Refiner(model, conf=0.5, mode="collage", names=MENU, samples=2, every=0)
+    for _ in range(6):
+        r.run(person(conf=0.9), img=frame)
+    assert model.calls == []
+
+
+def test_collage_hint_is_the_primary_word_not_the_menu_word(frame):
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=2, every=0)
+    for _ in range(2):
+        r.run(person(names={0: "person"}), img=frame)
+    assert model.calls[0]["hints"] == ["person"]
+
+
+def test_collage_cell_and_columns_set_the_sheet_size(frame):
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU,
+                samples=4, every=0, cell=(40, 80), cols=4, )
+    for _ in range(4):
+        r.run(person(), img=frame)
+    # one row of four 40 x 80 cells, with a 4px gutter around and between
+    assert model.calls[0]["shape"] == (80 + 2 * 4, 4 * 40 + 5 * 4, 3)
+
+
+def test_collage_forgets_its_buffer_on_reset(frame):
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=3, every=0)
+    r.run(person(), img=frame)
+    assert r.shots
+    r.reset()
+    assert not r.shots and r.frame == -1
+
+
+def test_collage_caps_how_many_tracks_it_gathers_at_once(frame):
+    r = Refiner(Sheets(), conf=1.0, mode="collage", names=MENU, samples=9, every=0, size=2)
+    r.run(Tracks(boxes(
+        [10, 10, 50, 90, 0.9, 0, 1],
+        [10, 10, 50, 90, 0.9, 0, 2],
+        [10, 10, 50, 90, 0.9, 0, 3],
+    )), img=frame)
+    assert len(r.shots) == 2  # the oldest track's tiles are dropped, not kept forever
+
+
+def test_collage_falls_back_to_batch_for_a_model_that_only_has_name(frame, fixed):
+    model = fixed(cls=1)
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=2, every=0)
+    r.run(person(), img=frame)
+    out = r.run(person(), img=frame)
+    assert model.calls == 1        # one name() call, on the collage
+    assert out.cls.tolist() == [1]
+
+
+def test_collage_runs_off_the_frame_loop_under_workers(frame, names):
+    model = Gated(cls=1)
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=2, every=0, workers=1)
+    try:
+        r.run(person(), img=frame)
+        out = r.run(person(), img=frame)
+        assert out.cls.tolist() == [0]  # still the primary's class
+        assert model.entered.wait(5)
+        model.gate.set()
+        r.wait()
+        assert r.run(person(), img=frame).cls.tolist() == [1]
+    finally:
+        model.gate.set()
+        r.close()

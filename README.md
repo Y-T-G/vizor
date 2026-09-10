@@ -153,7 +153,7 @@ Each frame goes through three steps.
 Step 3 is what makes this affordable. A car the detector is unsure of, in view
 for 300 frames, costs one VLM call, not 300. A car it is sure of costs none.
 
-There are two modes.
+There are three modes.
 
 `mode="full"` runs the secondary on the whole frame, matches its boxes to the
 tracks by IoU, and takes its box, confidence and class. Use it when the secondary
@@ -163,6 +163,10 @@ localises: Florence-2, a heavier YOLO, any open-vocabulary detector.
 secondary what it is. The box stays as the primary drew it and only the class
 changes. Use it when the secondary classifies but does not localise, which is
 every chat VLM.
+
+`mode="collage"` gathers several crops of the same track, spaced out over time,
+tiles them into one image and asks about that once. Use it when one frame is not
+enough to tell, so an attribute rather than a class.
 
 The refiner never adds or drops a box. It only rewrites the class, and in full
 mode the box and confidence too.
@@ -174,16 +178,20 @@ vz.Vizor(primary, secondary=None, conf=0.5, mode="full", names=None, **kw)
 ```
 
 - `conf` sends tracks at or below this confidence to the secondary.
-- `mode` is `"full"` or `"crop"`.
+- `mode` is `"full"`, `"crop"` or `"collage"`.
 - `names` maps class ids to strings. Defaults to whatever the primary reports.
 - `iou` is the minimum overlap to match a secondary box to a track, full mode only.
 - `votes` is how many answers to collect per track before the secondary stops
-  being asked, crop mode only. Default 1.
+  being asked, crop and collage modes. Default 1.
 - `size` and `hist` cap the vote cache at that many track ids and that many votes
   each.
 - `workers` runs the secondary on that many background threads, so the frame loop
   does not wait for it. The track keeps the primary's label until the answer
   arrives, then the vote corrects it. Default 0, which blocks.
+- `samples` and `every` are how many crops make a collage and how many frames
+  apart they are taken, collage mode only. Defaults 4 and 5.
+- `cell` and `cols` are the collage cell size and column count. `cell` takes one
+  number for a square or a `(width, height)` pair.
 - `chunk`, on `VLM`, is how many crops go in one request. Default 8.
 
 `viz.run(src, save=None, show=False)` yields refined `Tracks` for every frame of a
@@ -210,14 +218,15 @@ Indexing with an int gives you one `Track`. Indexing with a mask or a slice give
 you a new `Tracks`, and because numpy copies on fancy indexing, writing to it does
 not touch the original.
 
-Bundled models, all of them secondaries. The primary is yours to bring.
+Bundled models. `Pkl` can also be the primary. For the rest the primary is
+yours to bring.
 
 | Model | What it is | Mode | Extra |
 | --- | --- | --- | --- |
-| `VLM` | any OpenAI-compatible chat endpoint, so OpenAI or Gemini | `crop` | `api` |
-| `HF` | a local transformers chat VLM | `crop` | `hf` |
+| `VLM` | any OpenAI-compatible chat endpoint, so OpenAI or Gemini | `crop`, `collage` | `api` |
+| `HF` | a local transformers chat VLM | `crop`, `collage` | `hf` |
 | `Florence` | Florence-2 as an open-vocabulary detector | `full` | `hf` |
-| `Pkl` | replays predictions you saved earlier | either | none |
+| `Pkl` | replays predictions you saved earlier | `full` | none |
 
 ## Writing your own model
 

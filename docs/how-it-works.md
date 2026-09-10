@@ -50,7 +50,7 @@ for 300 frames, costs one VLM call, not 300. A car it is sure of costs none.
 The refiner never adds or drops a box. It only rewrites the class, and in full
 mode the box and confidence too.
 
-## The two modes
+## The three modes
 
 `mode="full"` runs the secondary on the whole frame, matches its boxes to the
 tracks by IoU, and takes its box, confidence and class. Use it when the secondary
@@ -81,8 +81,119 @@ viz = vz.Vizor(primary, vz.VLM("gemini-3.1-flash-lite", api="gemini"),
 asked about it. At the default of 1, each track costs exactly one call for its
 whole life. Raise it to trade calls for a majority that survives one bad answer.
 
+`mode="collage"` gathers several crops of the same track, spaced out over time,
+tiles them into one image and asks about that once. Use it when one frame is not
+enough to tell.
+
+```python
+# six crops of each track, eight frames apart, tiled three across
+viz = vz.Vizor(primary, vz.VLM("gemini-3.1-flash-lite", api="gemini"),
+               conf=1.0, mode="collage", names={0: "man", 1: "woman"},
+               samples=6, every=8, cell=(96, 192), cols=3)
+```
+
 The old names `"image"` and `"instance"` still work and mean `"full"` and
 `"crop"`.
+
+### Collage mode
+
+A crop from one frame is one glance. The person is facing away, or half behind a
+car, or eight pixels of motion blur. Asking a VLM to call it from that is asking
+it to guess, and a second question on a later frame only gets you a second
+guess.
+
+Collage mode gathers the glances instead. Each time a track comes round and is
+due a sample, its crop is resized into a cell and kept. Once there are `samples`
+of them they are tiled into one image, left to right and top to bottom, and that
+image is what the secondary is asked about. One question, one answer, one vote.
+
+```mermaid
+flowchart LR
+    T["track seen
+    this frame"]
+    D{"due a
+    sample?"}
+    B[("crops held
+    per track id")]
+    S["secondary
+    one sheet,
+    one question"]
+    C[("vote cache")]
+    W["write the class"]
+
+    T -- "box, id" --> D
+    D -- "no, too soon" --> W
+    D -- "yes, every N frames" --> B
+    B -- "still gathering" --> W
+    B -- "samples reached" --> S
+    S -- "one vote" --> C
+    C -- "majority" --> W
+
+    classDef vlm stroke:#d97706,stroke-width:3px
+    classDef store stroke:#16a34a,stroke-width:2px
+    class S vlm
+    class B,C store
+    linkStyle 4,5,6 stroke:#d97706,stroke-width:2px
+```
+
+With `samples=6`, `every=8` and `cols=3`, one track's sheet holds these frames.
+
+```
++-----+-----+-----+
+|  1  |  2  |  3  |     frames 0, 8 and 16
++-----+-----+-----+
+|  4  |  5  |  6  |     frames 24, 32 and 40
++-----+-----+-----+
+```
+
+`samples` is how many crops make a collage and `every` is how many frames apart
+they are taken. Together they set how long a track waits before it is answered.
+The last crop is taken `(samples - 1) * every` frames after the first, so at the
+defaults of 4 and 5 nothing is asked until a track has been in view for 15
+frames. Widen `every` to cover more of the track's life and get more varied
+crops, at the cost of answering later.
+
+`cell` is the size each crop is resized into, one number for a square or a
+`(width, height)` pair. People are taller than they are wide, so `(96, 192)`
+wastes less of the sheet on grey bars than a square would. `cols` sets the
+layout, and defaults to a square-ish grid.
+
+This is the mode for questions the detector was never trained on, so which way
+someone is facing, whether they are carrying something, which team a player is
+on. The primary keeps saying `person` and the menu you hand the refiner is the
+list of answers you will accept.
+
+```python
+# the detector's class list is not the menu. The VLM picks from these two.
+viz = vz.Vizor(primary, secondary, conf=1.0, mode="collage",
+               names={0: "man", 1: "woman"})
+```
+
+Two things follow from that. Set `conf=1.0`, because the question is not about
+doubt and a confident `person` box still needs answering. And filter the primary
+to the class you are asking about, or a car will come back labelled `man`, since
+the refiner writes whatever id the VLM returns.
+
+The hint the secondary is given stays in the primary's vocabulary, so it reads
+`'person'` even though the menu says man or woman. That is deliberate. It tells
+the model what the box was cut around without pushing it towards an answer.
+
+Untracked boxes are skipped in this mode. Gathering crops over time needs an id
+to gather them against, and `id = -1` is shared by everything the tracker has not
+locked onto.
+
+Memory is bounded. Crops are resized as they are gathered rather than at the end,
+so a track part way through a collage holds a few small tiles, and `size` caps
+how many tracks may be part way through at once.
+
+Build a collage yourself with [`montage`][vizor.utils.image.montage] if you want
+to see what the model is being sent.
+
+```python
+from vizor import montage
+
+sheet = montage(crops, cols=3, cell=(96, 192))   # one BGR image
+```
 
 ### Not waiting for the answer
 
@@ -128,6 +239,13 @@ hands the whole list to the secondary in one call to `batch`. A secondary that
 can answer about several crops at once, like [`VLM`][vizor.models.api.VLM], turns
 that into one request. One that cannot gets the default
 [`batch`][vizor.models.base.Model.batch], which calls `name` once per crop.
+
+Collage mode goes through [`grid`][vizor.models.base.Model.grid] instead, and
+sends one sheet per request. Several grids in one request would ask the model to
+keep the tiles and the grids straight at the same time, and collage mode already
+fires once per track rather than once per frame, so the round trips are not where
+the cost is. A model without a `grid` of its own falls back to `batch`, which
+treats the collage as an ordinary image.
 
 ## The vote cache
 
