@@ -27,7 +27,8 @@ class Vizor:
         mode: ``"full"`` runs the secondary on the whole frame, ``"crop"`` on each box.
         names: class id to name mapping. Defaults to whatever the primary reports.
 
-    Remaining keyword arguments go to [Refiner][vizor.refine.Refiner].
+    Remaining keyword arguments go to [Refiner][vizor.refine.Refiner]. Pass
+    ``workers`` there to stop the frame loop waiting on the secondary.
     """
 
     def __init__(
@@ -58,6 +59,20 @@ class Vizor:
         reset = getattr(self.primary, "reset", None)
         if callable(reset):
             reset()
+
+    def wait(self):
+        """Block until every background request has come back. See ``workers``."""
+        self.refiner.wait()
+
+    def close(self):
+        """Stop the background workers, dropping anything still in flight."""
+        self.refiner.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
 
     def step(self, img, preds=None):
         """Process one frame and return the refined [Tracks][vizor.boxes.Tracks]."""

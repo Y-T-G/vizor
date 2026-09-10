@@ -25,13 +25,17 @@ def main():
     args = ap.parse_args()
 
     viz = Vizor(
+        # the YOLO dump is in ultralytics column order, so reindex it
         Pkl(args.primary, cols=Pkl.ULTRALYTICS, names=NAMES),
+        # the Florence dump is already in vizor order
         Pkl(args.secondary, names=NAMES),
         conf=args.conf,
         mode="full",
         names=NAMES,
     )
 
+    # each frame pulls the next row out of both pickles, matches them by IoU, and
+    # votes the result against the track id. The video is only there to draw on.
     frames = 0
     start = time.perf_counter()
     for _ in viz.run(args.video, save=args.save, show=args.show):

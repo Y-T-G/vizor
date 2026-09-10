@@ -44,6 +44,8 @@ class Refiner:
         best: keep only the best IoU match per track instead of every match above ``iou``.
         size: how many track ids to keep in the vote cache.
         hist: how many votes to keep per track id.
+        workers: run the secondary on this many background threads instead of
+            blocking the frame loop. 0, the default, blocks. Crop mode only.
     """
 
     def __init__(
@@ -57,6 +59,7 @@ class Refiner:
         best: bool = True,
         size: int = 256,
         hist: int = 25,
+        workers: int = 0,
     ):
         if mode not in MODES:
             raise ValueError(f"mode must be one of {sorted(set(MODES))}, got {mode!r}")
@@ -68,10 +71,44 @@ class Refiner:
         self.votes = int(votes)
         self.best = bool(best)
         self.cache = Vote(size=size, hist=hist)
+        self.workers = max(0, int(workers))
+        self.pool = None
+        self.jobs = []    # (track ids, future) still in flight
+        self.busy = set()  # track ids the secondary is already looking at
+
+    def _open(self):
+        """The thread pool, built on first use so a blocking refiner starts none."""
+        if self.pool is None and self.workers:
+            from concurrent.futures import ThreadPoolExecutor
+
+            self.pool = ThreadPoolExecutor(self.workers, thread_name_prefix="vizor")
+        return self.pool
+
+    def wait(self):
+        """Block until every request in flight has come back, then bank the votes.
+
+        Only useful with ``workers``. The votes land too late for the frames that
+        triggered them, but they are there for whatever you refine next.
+        """
+        for _, fut in list(self.jobs):
+            fut.exception()
+        self._drain()
+
+    def close(self):
+        """Stop the workers. Anything still in flight is dropped."""
+        self.jobs.clear()
+        self.busy.clear()
+        if self.pool is not None:
+            self.pool.shutdown(wait=False, cancel_futures=True)
+            self.pool = None
 
     def reset(self):
-        """Forget every vote. Call this between videos."""
+        """Forget every vote and drop anything in flight. Call this between videos."""
         self.cache.clear()
+        for _, fut in self.jobs:
+            fut.cancel()
+        self.jobs.clear()
+        self.busy.clear()
 
     def run(self, tracks, img=None, preds=None):
         """Refine ``tracks`` in place and return them.
@@ -123,17 +160,68 @@ class Refiner:
             tracks[i] = track
 
     def _crop(self, tracks, img):
+        # answers that came back since the last frame, applied before we ask again
+        self._drain()
         if self.model is None or img is None:
             return
-        for track in tracks:
-            if track.conf > self.conf or self.cache.count(track.id) >= self.votes:
+        # collect the whole frame's doubtful crops first, so a model that can
+        # answer about several at once gets the chance to
+        ids, rows, crops, hints = [], [], [], []
+        for i, track in enumerate(tracks):
+            if track.conf > self.conf or not self._due(track.id):
                 continue
             patch = crop(img, track.box)
             if patch.size == 0:
                 continue
-            cls = self.model.name(patch, self.names, hint=label(self.names, track.cls))
-            if cls is not None:
-                self.cache.add(track.id, cls)
+            ids.append(track.id)
+            rows.append(i)
+            crops.append(patch)
+            hints.append(label(self.names, track.cls))
+        if not crops:
+            return
+        # Model.batch falls back to one name() call per crop, so a model that
+        # only implements name still works and behaves exactly as before
+        pool = self._open()
+        if pool is None:
+            self._store(self.model.batch(crops, self.names, hints), ids, rows, tracks)
+            return
+        self.busy.update(ids)
+        self.jobs.append((ids, pool.submit(self.model.batch, crops, self.names, hints)))
+
+    def _due(self, id):
+        """Is this track worth asking about again?"""
+        if id < 0:
+            # untracked boxes share id -1, so a vote for one would be a vote for
+            # all of them. They are answered inline instead, which a background
+            # worker cannot do because the frame is gone by the time it replies.
+            return self.pool is None and self.workers == 0
+        return self.cache.count(id) < self.votes and id not in self.busy
+
+    def _drain(self):
+        """Bank the votes from any request that has finished."""
+        if not self.jobs:
+            return
+        left = []
+        for ids, fut in self.jobs:
+            if not fut.done():
+                left.append((ids, fut))
+                continue
+            self.busy.difference_update(ids)
+            self._store(fut.result(), ids)  # a worker's error surfaces here
+        self.jobs = left
+
+    def _store(self, out, ids, rows=None, tracks=None):
+        """One answer per crop: a vote for a track, or a direct write if untracked."""
+        for i, (id, cls) in enumerate(zip(ids, out)):
+            if cls is None:
+                continue
+            if id >= 0:
+                self.cache.add(id, cls)
+            elif tracks is not None:
+                # nothing to remember it by, so write it now or lose it
+                track = tracks[rows[i]]
+                track.cls = cls
+                tracks[rows[i]] = track
 
     def _apply(self, tracks):
         """Overwrite each class with the running majority vote for its track id."""

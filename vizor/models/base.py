@@ -2,7 +2,7 @@
 
 from ..boxes import Preds, Tracks  # noqa: F401  (re-exported for implementers)
 
-__all__ = ["Model", "PROMPT", "menu", "ids", "parse_id"]
+__all__ = ["Model", "PROMPT", "BATCH", "menu", "ids", "parse_id", "parse_ids"]
 
 
 class Model:
@@ -34,6 +34,18 @@ class Model:
         """
         raise NotImplementedError(f"{type(self).__name__} does not support mode='crop'")
 
+    def batch(self, crops, names=None, hints=None):
+        """Classify several BGR crops. Returns one class id or None per crop.
+
+        The default asks ``name`` once per crop, so a model that only implements
+        ``name`` works unchanged. Override this when the model can do the whole
+        list in one call, which is what makes crop mode cheap.
+
+        ``hints`` is what the primary thought each object was, in the same order.
+        """
+        hints = list(hints) if hints is not None else [None] * len(crops)
+        return [self.name(c, names, h) for c, h in zip(crops, hints)]
+
     def reset(self):
         """Drop any per-video state. Called by ``Vizor.reset``."""
 
@@ -47,6 +59,17 @@ PROMPT = (
     "Which of these classes is it?\n{menu}\n"
     "Reply with the class id only: a single integer, no words, no punctuation. "
     "Reply -1 if none of them fit."
+)
+
+
+BATCH = (
+    "These are {n} crops, each one object taken from a detector's box, "
+    "given in order and numbered.\n"
+    "The detector guessed: {hints}. Those guesses may be wrong.\n"
+    "Which of these classes is each crop?\n{menu}\n"
+    "Reply with exactly {n} class ids, one per crop, in the same order, "
+    "separated by commas. Use -1 for a crop where none of them fit. "
+    "No words, no explanation, only the numbers and commas."
 )
 
 
@@ -73,9 +96,27 @@ def parse_id(text, valid=None):
     if text is None:
         return None
     found = re.search(r"-?\d+", str(text))
-    if not found:
-        return None
-    cls = int(found.group())
+    return _check(found.group(), valid) if found else None
+
+
+def parse_ids(text, n, valid=None):
+    """Pull ``n`` class ids out of a batched reply, in order.
+
+    A reply with too few numbers is padded with None, one with too many is cut.
+    Either way the caller gets exactly ``n`` entries, so a model that miscounts
+    costs some crops their refinement rather than shifting every later answer
+    onto the wrong object.
+    """
+    import re
+
+    found = re.findall(r"-?\d+", str(text)) if text is not None else []
+    out = [_check(x, valid) for x in found[:n]]
+    return out + [None] * (n - len(out))
+
+
+def _check(text, valid):
+    """A parsed id, or None when it is negative or outside the menu."""
+    cls = int(text)
     if cls < 0:
         return None
     if valid is not None and cls not in valid:

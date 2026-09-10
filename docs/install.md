@@ -18,8 +18,7 @@ Each extra pulls in the dependency for one group of model wrappers.
 | Extra | Installs | Gets you |
 | --- | --- | --- |
 | `hf` | `torch`, `transformers`, `pillow`, `einops`, `timm` | [`HF`][vizor.models.hf.HF] and [`Florence`][vizor.models.hf.Florence] |
-| `api` | `openai` | [`VLM`][vizor.models.api.VLM] against OpenAI or any compatible url |
-| `groq` | `groq` | `VLM(api="groq")` |
+| `api` | `openai` | [`VLM`][vizor.models.api.VLM] against OpenAI, Gemini, or any compatible url |
 | `dev` | `pytest`, `ruff` | the test suite and the linter |
 | `docs` | `zensical`, `mkdocstrings[python]` | building this site |
 
@@ -57,7 +56,7 @@ clone reports fewer than 59.
 
 ## Lazy imports
 
-`import vizor` never imports torch, transformers, openai or groq. The model
+`import vizor` never imports torch, transformers or openai. The model
 wrappers are resolved through a module-level `__getattr__` and imported the first
 time you name one.
 
