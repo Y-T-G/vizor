@@ -8,8 +8,9 @@ Vizor runs both and keeps the useful half of each. Boxes and track ids come from
 the detector. Class labels come from the VLM. Every VLM answer is cached against
 the track id, so the same object is never asked about twice.
 
-The code is at [github.com/Y-T-G/vizor](https://github.com/Y-T-G/vizor). The
-`examples/` directory holds runnable versions of everything on this page.
+The package is on PyPI as [vizor](https://pypi.org/project/vizor/) and the code
+is at [github.com/Y-T-G/vizor](https://github.com/Y-T-G/vizor). The `examples/`
+directory holds runnable versions of everything on this page.
 
 ## Install
 
