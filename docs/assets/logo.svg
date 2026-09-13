@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="vizor">
+  <defs>
+    <clipPath id="tile"><rect width="512" height="512" rx="123" ry="123"></rect></clipPath>
+    <linearGradient id="ground" gradientUnits="userSpaceOnUse" x1="512" y1="0" x2="0" y2="512">
+      <stop offset="0" stop-color="#1F2433"></stop>
+      <stop offset="1" stop-color="#0B0D14"></stop>
+    </linearGradient>
+    <radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="215" cy="174" r="307">
+      <stop offset="0" stop-color="#7D8BF5" stop-opacity="0.333"></stop>
+      <stop offset="1" stop-color="#7D8BF5" stop-opacity="0"></stop>
+    </radialGradient>
+    <g id="mark" fill="none" stroke="currentColor" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 173 -2 Q 233 -26 293 -2"></path>
+      <path d="M 173 86 Q 233 110 293 86"></path>
+      <path d="M 281 -6.3 L 185 90.3"></path>
+    </g>
+    <linearGradient id="face" gradientUnits="userSpaceOnUse" x1="160" y1="-27" x2="306" y2="111">
+      <stop offset="0" stop-color="#FFFFFF"></stop>
+      <stop offset="0.45" stop-color="#E9EBFF"></stop>
+      <stop offset="1" stop-color="#7D8BF5"></stop>
+    </linearGradient>
+    <mask id="face-mask" maskUnits="userSpaceOnUse" x="100" y="-100" width="300" height="300">
+      <use href="#mark" color="#FFFFFF"></use>
+    </mask>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="512" height="512" fill="url(#ground)"></rect>
+    <rect width="512" height="512" fill="url(#glow)"></rect>
+    <g transform="scale(2.2069) translate(-122,68)">
+      <use href="#mark" color="rgb(31, 37, 102)" transform="translate(8.80,11.20)"></use>
+    <use href="#mark" color="rgb(36, 43, 115)" transform="translate(7.70,9.80)"></use>
+    <use href="#mark" color="rgb(42, 50, 129)" transform="translate(6.60,8.40)"></use>
+    <use href="#mark" color="rgb(47, 56, 142)" transform="translate(5.50,7.00)"></use>
+    <use href="#mark" color="rgb(53, 63, 156)" transform="translate(4.40,5.60)"></use>
+    <use href="#mark" color="rgb(58, 69, 169)" transform="translate(3.30,4.20)"></use>
+    <use href="#mark" color="rgb(64, 76, 183)" transform="translate(2.20,2.80)"></use>
+    <use href="#mark" color="rgb(69, 82, 196)" transform="translate(1.10,1.40)"></use>
+    
+      <use href="#mark" color="#FFFFFF" opacity="0.85" transform="translate(-1.2,-1.6)"></use>
+      <rect x="100" y="-100" width="300" height="300" fill="url(#face)" mask="url(#face-mask)"></rect>
+    </g>
+  </g>
+</svg>
