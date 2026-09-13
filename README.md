@@ -1,4 +1,10 @@
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/Y-T-G/vizor/master/docs/assets/logo-512.png" width="112" height="112" alt="vizor logo">
+
 # vizor
+
+</div>
 
 [![PyPI](https://img.shields.io/pypi/v/vizor?color=007ec6&label=pypi)](https://pypi.org/project/vizor/)
 [![Python](https://img.shields.io/badge/python-3.9%2B-007ec6)](https://pypi.org/project/vizor/)
