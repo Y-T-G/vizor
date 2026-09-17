@@ -171,7 +171,8 @@ class Refiner:
     # modes ----------------------------------------------------------------
     def _full(self, tracks, img, preds):
         # nothing is in doubt, so the secondary has nothing to add
-        if not (tracks.conf <= self.conf).any():
+        low = tracks.conf <= self.conf
+        if not low.any():
             return
         if preds is None:
             if self.model is None:
@@ -183,6 +184,9 @@ class Refiner:
             return
         m = iou(tracks.boxes, preds.boxes)
         for i, row in enumerate(m):
+            # the secondary saw the whole frame, but a confident track is left alone
+            if not low[i]:
+                continue
             idx = np.flatnonzero(row >= self.iou)
             if not len(idx):
                 continue

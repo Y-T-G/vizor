@@ -33,6 +33,15 @@ def test_full_skips_confident_tracks():
     assert out.cls[0] == 0  # left alone, so the secondary costs nothing
 
 
+def test_full_leaves_confident_tracks_alone_next_to_doubtful_ones():
+    tracks = Tracks(boxes([0, 0, 100, 100, 0.3, 0, 1], [200, 200, 300, 300, 0.9, 0, 2]))
+    preds = Preds(np.array([[0, 0, 100, 100, 0.95, 7],
+                            [200, 200, 300, 300, 0.95, 7]], np.float32))
+    out = Refiner(conf=0.5, mode="full").run(tracks, preds=preds)
+    assert out.cls.tolist() == [7, 0]  # the secondary saw both, only the doubtful one takes it
+    assert out.conf[1] == pytest.approx(0.9)
+
+
 def test_full_needs_enough_overlap():
     tracks = Tracks(boxes([0, 0, 100, 100, 0.3, 0, 1]))
     preds = Preds(np.array([[200, 200, 300, 300, 0.95, 7]], np.float32))
