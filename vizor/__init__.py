@@ -7,7 +7,7 @@
         print(out)
 """
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 from .boxes import Preds, Track, Tracks, iou
 from .core import Vizor
