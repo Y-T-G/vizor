@@ -302,14 +302,17 @@ class Refiner:
         """Bank the votes from any request that has finished."""
         if not self.jobs:
             return
-        left = []
-        for ids, fut in self.jobs:
-            if not fut.done():
-                left.append((ids, fut))
-                continue
-            self.busy.difference_update(ids)
-            self._store(fut.result(), ids)  # a worker's error surfaces here
+        left, done = [], []
+        for job in self.jobs:
+            (left if not job[1].done() else done).append(job)
+        # the finished jobs leave the list before their answers are read, so an
+        # error surfaces once rather than on every frame, and the tracks it
+        # covered are free to be asked again
         self.jobs = left
+        for ids, _ in done:
+            self.busy.difference_update(ids)
+        for ids, fut in done:
+            self._store(fut.result(), ids)  # a worker's error surfaces here
 
     def _store(self, out, ids, rows=None, tracks=None):
         """One answer per crop: a vote for a track, or a direct write if untracked."""
