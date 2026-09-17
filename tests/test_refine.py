@@ -478,6 +478,17 @@ def test_collage_cell_and_columns_set_the_sheet_size(frame):
     assert model.calls[0]["shape"] == (80 + 2 * 4, 4 * 40 + 5 * 4, 3)
 
 
+def test_collage_cell_takes_the_same_shapes_as_montage(frame):
+    # a float pair used to reach fit() as it was and fail building the tile
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=2, every=0, cell=(40.0, 80.0))
+    assert r.cell == (40, 80)
+    r.run(person(), img=frame)
+    r.run(person(), img=frame)
+    assert model.calls[0]["shape"] == (80 + 2 * 4, 2 * 40 + 3 * 4, 3)
+    assert Refiner(cell=64.0).cell == (64, 64)
+
+
 def test_collage_forgets_its_buffer_on_reset(frame):
     model = Sheets()
     r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=3, every=0)

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from .boxes import Preds, Tracks, iou
-from .utils.image import crop, fit, label, montage
+from .utils.image import _cell, crop, fit, label, montage
 from .vote import Vote
 
 if TYPE_CHECKING:
@@ -98,7 +98,7 @@ class Refiner:
         self.workers = max(0, int(workers))
         self.samples = max(1, int(samples))
         self.every = max(0, int(every))
-        self.cell = (int(cell), int(cell)) if isinstance(cell, (int, float)) else tuple(cell)
+        self.cell = _cell(cell)
         self.cols = cols
         self.pool = None
         self.jobs = []     # (track ids, future) still in flight
