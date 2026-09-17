@@ -196,7 +196,11 @@ class Refiner:
             for j in idx:
                 pred = preds[int(j)]
                 track.box, track.conf = pred.box, pred.conf
-                self.cache.add(track.id, pred.cls)
+                if track.id >= 0:
+                    self.cache.add(track.id, pred.cls)
+                else:
+                    # nothing to remember it by, so write it now or lose it
+                    track.cls = pred.cls
             tracks[i] = track
 
     def _crop(self, tracks, img):

@@ -84,6 +84,14 @@ def test_untracked_boxes_do_not_share_votes():
     assert out.cls[0] == 1
 
 
+def test_full_writes_the_class_of_an_untracked_box():
+    """id = -1 cannot be voted on, so the class lands on this frame with the box."""
+    preds = Preds(np.array([[2, 2, 102, 102, 0.95, 7]], np.float32))
+    out = Refiner(conf=0.5, mode="full").run(Tracks(boxes([0, 0, 100, 100, 0.3, 0, -1])), preds=preds)
+    assert out.cls[0] == 7
+    assert out.conf[0] == pytest.approx(0.95)
+
+
 def test_best_match_only():
     tracks = Tracks(boxes([0, 0, 100, 100, 0.3, 0, 1]))
     preds = Preds(np.array([[0, 0, 100, 100, 0.9, 7],
