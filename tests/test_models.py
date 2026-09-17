@@ -74,6 +74,35 @@ def test_lazy_imports_do_not_need_torch():
         _ = vizor.NoSuchModel
 
 
+def test_hf_takes_the_dtype_as_a_string(monkeypatch):
+    """The docstring says torch dtype and the annotation says str, so both work."""
+    import sys
+
+    seen = {}
+
+    class Loaded:
+        def to(self, *args):
+            return self
+
+    def load(model, **kw):
+        seen.update(kw)
+        return Loaded()
+
+    torch = types.SimpleNamespace(
+        cuda=types.SimpleNamespace(is_available=lambda: False),
+        float16="f16", float32="f32", bfloat16="bf16")
+    transformers = types.SimpleNamespace(
+        AutoProcessor=types.SimpleNamespace(from_pretrained=lambda model, **kw: None),
+        AutoModelForImageTextToText=types.SimpleNamespace(from_pretrained=load))
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setitem(sys.modules, "transformers", transformers)
+    from vizor.models.hf import HF
+
+    assert HF("m", dtype="float16").dtype == "f16"
+    assert seen["torch_dtype"] == "f16"      # the resolved dtype is what the model is loaded in
+    assert HF("m").dtype == "f32"            # the cpu default is untouched
+
+
 # batching --------------------------------------------------------------
 
 
