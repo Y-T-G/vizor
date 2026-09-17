@@ -28,7 +28,8 @@ class HF(Model):
     Args:
         model: hub id or local path.
         device: ``"cuda"``, ``"cpu"``, or None to pick whatever is available.
-        dtype: torch dtype, defaults to bfloat16 on GPU and float32 on CPU.
+        dtype: torch dtype or its name, e.g. ``"float16"``. Defaults to bfloat16
+            on GPU and float32 on CPU.
         prompt: format string overriding the default. Given ``hint`` and ``menu``.
         grid: format string overriding the collage prompt, used by ``mode="collage"``.
             Given ``n`` (tiles in the collage), ``hint`` and ``menu``.
@@ -51,6 +52,8 @@ class HF(Model):
         from transformers import AutoProcessor
 
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        # from_pretrained takes a name, but the .to() calls later need the real dtype
+        dtype = getattr(torch, dtype) if isinstance(dtype, str) else dtype
         self.dtype = dtype or (torch.bfloat16 if self.device == "cuda" else torch.float32)
         self.prompt = prompt or PROMPT
         self.grid_prompt = grid or GRID

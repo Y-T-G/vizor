@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from .boxes import Preds, Tracks, iou
-from .utils.image import crop, fit, label, montage
+from .utils.image import _cell, crop, fit, label, montage
 from .vote import Vote
 
 if TYPE_CHECKING:
@@ -98,7 +98,7 @@ class Refiner:
         self.workers = max(0, int(workers))
         self.samples = max(1, int(samples))
         self.every = max(0, int(every))
-        self.cell = (int(cell), int(cell)) if isinstance(cell, (int, float)) else tuple(cell)
+        self.cell = _cell(cell)
         self.cols = cols
         self.pool = None
         self.jobs = []     # (track ids, future) still in flight
@@ -171,7 +171,8 @@ class Refiner:
     # modes ----------------------------------------------------------------
     def _full(self, tracks, img, preds):
         # nothing is in doubt, so the secondary has nothing to add
-        if not (tracks.conf <= self.conf).any():
+        low = tracks.conf <= self.conf
+        if not low.any():
             return
         if preds is None:
             if self.model is None:
@@ -183,6 +184,9 @@ class Refiner:
             return
         m = iou(tracks.boxes, preds.boxes)
         for i, row in enumerate(m):
+            # the secondary saw the whole frame, but a confident track is left alone
+            if not low[i]:
+                continue
             idx = np.flatnonzero(row >= self.iou)
             if not len(idx):
                 continue
@@ -192,7 +196,11 @@ class Refiner:
             for j in idx:
                 pred = preds[int(j)]
                 track.box, track.conf = pred.box, pred.conf
-                self.cache.add(track.id, pred.cls)
+                if track.id >= 0:
+                    self.cache.add(track.id, pred.cls)
+                else:
+                    # nothing to remember it by, so write it now or lose it
+                    track.cls = pred.cls
             tracks[i] = track
 
     def _crop(self, tracks, img):
@@ -294,14 +302,17 @@ class Refiner:
         """Bank the votes from any request that has finished."""
         if not self.jobs:
             return
-        left = []
-        for ids, fut in self.jobs:
-            if not fut.done():
-                left.append((ids, fut))
-                continue
-            self.busy.difference_update(ids)
-            self._store(fut.result(), ids)  # a worker's error surfaces here
+        left, done = [], []
+        for job in self.jobs:
+            (left if not job[1].done() else done).append(job)
+        # the finished jobs leave the list before their answers are read, so an
+        # error surfaces once rather than on every frame, and the tracks it
+        # covered are free to be asked again
         self.jobs = left
+        for ids, _ in done:
+            self.busy.difference_update(ids)
+        for ids, fut in done:
+            self._store(fut.result(), ids)  # a worker's error surfaces here
 
     def _store(self, out, ids, rows=None, tracks=None):
         """One answer per crop: a vote for a track, or a direct write if untracked."""

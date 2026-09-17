@@ -33,6 +33,15 @@ def test_full_skips_confident_tracks():
     assert out.cls[0] == 0  # left alone, so the secondary costs nothing
 
 
+def test_full_leaves_confident_tracks_alone_next_to_doubtful_ones():
+    tracks = Tracks(boxes([0, 0, 100, 100, 0.3, 0, 1], [200, 200, 300, 300, 0.9, 0, 2]))
+    preds = Preds(np.array([[0, 0, 100, 100, 0.95, 7],
+                            [200, 200, 300, 300, 0.95, 7]], np.float32))
+    out = Refiner(conf=0.5, mode="full").run(tracks, preds=preds)
+    assert out.cls.tolist() == [7, 0]  # the secondary saw both, only the doubtful one takes it
+    assert out.conf[1] == pytest.approx(0.9)
+
+
 def test_full_needs_enough_overlap():
     tracks = Tracks(boxes([0, 0, 100, 100, 0.3, 0, 1]))
     preds = Preds(np.array([[200, 200, 300, 300, 0.95, 7]], np.float32))
@@ -73,6 +82,14 @@ def test_untracked_boxes_do_not_share_votes():
     ref.run(Tracks(boxes([0, 0, 100, 100, 0.3, 0, -1])), preds=preds)
     out = ref.run(Tracks(boxes([500, 500, 600, 600, 0.3, 1, -1])))
     assert out.cls[0] == 1
+
+
+def test_full_writes_the_class_of_an_untracked_box():
+    """id = -1 cannot be voted on, so the class lands on this frame with the box."""
+    preds = Preds(np.array([[2, 2, 102, 102, 0.95, 7]], np.float32))
+    out = Refiner(conf=0.5, mode="full").run(Tracks(boxes([0, 0, 100, 100, 0.3, 0, -1])), preds=preds)
+    assert out.cls[0] == 7
+    assert out.conf[0] == pytest.approx(0.95)
 
 
 def test_best_match_only():
@@ -293,6 +310,51 @@ def test_a_worker_error_surfaces_on_the_main_thread(frame, names):
         r.close()
 
 
+def test_a_worker_error_surfaces_once_and_frees_the_track(frame, names):
+    class Flaky(Model):
+        def __init__(self):
+            self.calls = 0
+
+        def batch(self, crops, names=None, hints=None):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("the api said no")
+            return [7] * len(crops)
+
+    model = Flaky()
+    r = Refiner(model, conf=0.5, mode="crop", names=names, workers=1)
+    try:
+        r.run(doubtful(names), img=frame)
+        with pytest.raises(RuntimeError):
+            r.wait()
+        assert not r.jobs and not r.busy      # the failed request is gone, not stuck
+        r.run(doubtful(names), img=frame)     # does not raise again, and asks again
+        r.wait()
+        assert model.calls == 2
+        assert r.run(doubtful(names), img=frame).cls.tolist() == [7]
+    finally:
+        r.close()
+
+
+def test_a_worker_error_does_not_recount_the_answers_before_it(frame, names):
+    class Flaky(Model):
+        def batch(self, crops, names=None, hints=None):
+            if "car" in hints:
+                raise RuntimeError("the api said no")
+            return [7] * len(crops)
+
+    r = Refiner(Flaky(), conf=0.5, mode="crop", names=names, workers=2)
+    try:
+        r.run(doubtful(names, id=1), img=frame)
+        r.run(Tracks(boxes([0, 0, 40, 40, 0.2, 2, 2]), names=names), img=frame)
+        with pytest.raises(RuntimeError):
+            r.wait()
+        r.wait()                              # nothing left to raise
+        assert r.cache.count(1) == 1          # banked once, not once per drain
+    finally:
+        r.close()
+
+
 def test_reset_and_close_drop_work_in_flight(frame, names):
     model = Gated()
     r = Refiner(model, conf=0.5, mode="crop", names=names, workers=1)
@@ -414,6 +476,17 @@ def test_collage_cell_and_columns_set_the_sheet_size(frame):
         r.run(person(), img=frame)
     # one row of four 40 x 80 cells, with a 4px gutter around and between
     assert model.calls[0]["shape"] == (80 + 2 * 4, 4 * 40 + 5 * 4, 3)
+
+
+def test_collage_cell_takes_the_same_shapes_as_montage(frame):
+    # a float pair used to reach fit() as it was and fail building the tile
+    model = Sheets()
+    r = Refiner(model, conf=1.0, mode="collage", names=MENU, samples=2, every=0, cell=(40.0, 80.0))
+    assert r.cell == (40, 80)
+    r.run(person(), img=frame)
+    r.run(person(), img=frame)
+    assert model.calls[0]["shape"] == (80 + 2 * 4, 2 * 40 + 3 * 4, 3)
+    assert Refiner(cell=64.0).cell == (64, 64)
 
 
 def test_collage_forgets_its_buffer_on_reset(frame):
